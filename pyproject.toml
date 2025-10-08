@@ -1,0 +1,21 @@
+[project]
+name = "paquete-python"
+paquete-python = { path = "../paquete-python", develop = true }
+version = "0.1.0"
+description = "A Python package to interact quith T8 api"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8.2.1",
+    "construct>=2.10.70",
+    "matplotlib>=3.10.6",
+    "numpy>=2.3.2",
+    "pyqt5>=5.15.11",
+    "pytest>=8.4.2",
+    "ruff>=0.13.3",
+    "requests",
+    "python-dotenv",
+]
+
+[project.scripts]
+t8-cli = "src.cli:cli"
