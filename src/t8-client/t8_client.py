@@ -726,8 +726,9 @@ class T8ApiClient:
         waveform = waveform - np.mean(waveform)
         
         # Aplicar ventana Hanning para reducir efectos de borde
-        window = np.hanning(len(waveform))
-        waveform_windowed = waveform * window
+        # window = np.hanning(len(waveform))
+        # waveform_windowed = waveform * window
+        waveform_windowed = waveform.copy()
             
         # Calcular FFT
         spectrum = np.fft.fft(waveform_windowed)
