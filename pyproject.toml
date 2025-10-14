@@ -12,6 +12,8 @@ dependencies = [
     "pyqt5>=5.15.11",
     "requests",
     "python-dotenv",
+    "tornado>=6.5.2",
+    "datetime",
 ]
 
 [build-system]
