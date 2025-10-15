@@ -257,7 +257,7 @@ class T8ApiClient:
         return True
 
     def get_wave(self, machine: str, point: str, procMode: str, 
-                 date: str | None = "0") -> dict | bool:
+                 date: str | None = "0") -> dict | None:
         """
         Obtiene una onda específica o la más reciente si no se especifica fecha.
         Guarda la onda en un archivo JSON y devuelve los datos de la onda.
@@ -275,7 +275,7 @@ class T8ApiClient:
             timestamp = self._parse_date_to_timestamp(date)
         except ValueError as e:
             print(str(e))
-            return False
+            return None
         
         # Construir URL para obtener la onda específica
         url = (BASE_URL + "waves/" + machine + "/" + point + "/" + 
@@ -284,8 +284,8 @@ class T8ApiClient:
         data = self.check_ok_response(response)
         
         if not data:
-            return False
-
+            return None
+        
         # Guardar en archivo JSON
         self.save_to_file(data, machine, point, procMode, timestamp, is_wave=True)
         
