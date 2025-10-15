@@ -50,6 +50,126 @@ class T8ApiClient:
         self.session = requests.Session()
         self.token = None
 
+    def _parse_date_to_timestamp(self, date: str | None) -> int:
+        """
+        Convierte una fecha en formato ISO 8601 o timestamp a entero timestamp.
+        
+        Args:
+            date: Fecha en formato ISO 8601, timestamp, o None para la más reciente
+            
+        Returns:
+            int: Timestamp como entero
+            
+        Raises:
+            ValueError: Si el formato de fecha es inválido
+        """
+        try:
+            if "T" in str(date):
+                dt = datetime.fromisoformat(str(date))
+                # Para spectrum necesitamos UTC
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=UTC)
+                dt = dt.astimezone(UTC)
+                return int(dt.timestamp())
+            else:
+                return int(date)
+        except ValueError as e:
+            raise ValueError(
+                "Error de formato: ISO 8601 (YYYY-MM-DDTHH:MM:SS) o timestamp entero."
+            ) from e
+
+    def _setup_matplotlib_interactive(self) -> None:
+        """Configura matplotlib para mostrar gráficos interactivos."""
+        matplotlib.use("WebAgg")
+
+    def _save_and_show_plot(self, machine: str, point: str, procMode: str, 
+                           plot_type: str, save_file: str | None = None, 
+                           suffix: str = "") -> None:
+        """
+        Guarda y muestra un gráfico de matplotlib.
+        
+        Args:
+            machine: ID de la máquina
+            point: Punto de medida
+            procMode: Modo de procesamiento
+            plot_type: Tipo de gráfico ('wave', 'spectrum')
+            save_file: Ruta personalizada para guardar (opcional)
+            suffix: Sufijo adicional para el nombre del archivo
+        """
+        plt.tight_layout()
+        
+        # Guardar el gráfico
+        if save_file:
+            plt.savefig(save_file, dpi=300, bbox_inches="tight")
+            print(f"✓ Gráfico guardado en: {save_file}")
+        else:
+            # Guardar automáticamente en data/plots/
+            filename = f"{plot_type}_{machine}_{point}_{procMode}{suffix}_plot.png"
+            auto_save = get_plot_filename(filename)
+            plt.savefig(auto_save, dpi=300, bbox_inches="tight")
+            print(f"✓ Gráfico guardado en: {auto_save}")
+        
+        # Mostrar el gráfico interactivo
+        try:
+            print("📊 Mostrando gráfico interactivo...")
+            print("   (Cierra la ventana para continuar)")
+            plt.show()
+        except Exception as e:
+            print(f"⚠️  No se pudo mostrar gráfico interactivo: {e}")
+            print("   Gráfico guardado correctamente en archivo.")
+
+    def _parse_machine_path(self, path: str) -> tuple[str, str, str]:
+        """
+        Parsea un path de máquina y extrae machine, point y proc_mode.
+        
+        Args:
+            path: Path en formato "machine:point:proc_mode"
+            
+        Returns:
+            tuple: (machine, point, proc_mode)
+        """
+        parts = path.split(":")
+        machine = parts[0] if len(parts) > 0 else "Unknown"
+        point = parts[1] if len(parts) > 1 else "Unknown"
+        proc_mode = parts[2] if len(parts) > 2 else "Unknown"
+        return machine, point, proc_mode
+
+    def _get_machine_config(
+        self, machine_name: str, point: str, proc_mode: str
+    ) -> dict | None:
+        """
+        Obtiene la configuración de una máquina específica desde la API.
+        
+        Args:
+            machine_name: Nombre de la máquina
+            point: Punto de medida
+            proc_mode: Modo de procesamiento
+            
+        Returns:
+            dict | None: Configuración de la máquina o None si no se encuentra
+        """
+        try:
+            url = BASE_URL + "confs/0"
+            response = self.session.get(url)
+            conf_data = self.check_ok_response(response)
+            
+            if not conf_data:
+                return None
+                
+            machines = conf_data.get("machines", [])
+            for machine in machines:
+                if machine.get("name") == machine_name:
+                    points = machine.get("points", [])
+                    for p in points:
+                        if p.get("name") == point:
+                            proc_modes = p.get("proc_modes", [])
+                            for mode in proc_modes:
+                                if mode.get("name") == proc_mode:
+                                    return mode
+            return None
+        except Exception:
+            return None
+
     def login_with_credentials(self, username: str, password: str) -> bool:
         # Primero obtenemos la página de login para obtener cualquier token CSRF
         login_page_url = "https://lzfs45.mirror.twave.io/lzfs45/signin"
@@ -116,26 +236,28 @@ class T8ApiClient:
                 else:
                     print(f"{i:2d}. URL: {wave_url}")
 
-    def list_waves(self, machine: str, point: str, procMode: str) -> None:
+    def list_waves(self, machine: str, point: str, procMode: str) -> bool:
         url = BASE_URL + "waves/" + machine + "/" + point + "/" + procMode
         response = self.session.get(url)
         data = self.check_ok_response(response)
         if not data:
-            return 
+            return False
         for wave in data.get("_items", []):
             print(self.get_timestamp_and_formatted_wave_date(wave))
+        return True
 
-    def list_spectra(self, machine: str, point: str, procMode: str) -> None:
+    def list_spectra(self, machine: str, point: str, procMode: str) -> bool:
         url = BASE_URL + "spectra/" + machine + "/" + point + "/" + procMode
         response = self.session.get(url)
         data = self.check_ok_response(response)
         if not data:
-            return 
+            return False
         for wave in data.get("_items", []):
             print(self.get_timestamp_and_formatted_wave_date(wave))
+        return True
 
     def get_wave(self, machine: str, point: str, procMode: str, 
-                 date: str | None = "0") -> dict | None:
+                 date: str | None = "0") -> dict | bool:
         """
         Obtiene una onda específica o la más reciente si no se especifica fecha.
         Guarda la onda en un archivo JSON y devuelve los datos de la onda.
@@ -150,34 +272,32 @@ class T8ApiClient:
             dict | None: Datos de la onda o None si hay error
         """
         try:
-            if "T" in str(date):
-                dt = datetime.fromisoformat(str(date))
-                date = int(dt.timestamp())
-            else:
-                date = int(date)
-        except ValueError:
-            print("Error de formato:ISO 8601 (YYYY-MM-DDTHH:MM:SS) o timestamp entero.")
-            return None
+            timestamp = self._parse_date_to_timestamp(date)
+        except ValueError as e:
+            print(str(e))
+            return False
         
         # Construir URL para obtener la onda específica
         url = (BASE_URL + "waves/" + machine + "/" + point + "/" + 
-               procMode + "/" + str(date))
+               procMode + "/" + str(timestamp))
         response = self.session.get(url)
         data = self.check_ok_response(response)
         
         if not data:
-            return None
-        
+            return False
+
         # Guardar en archivo JSON
-        self.save_to_file(data, machine, point, procMode, date, is_wave=True)
+        self.save_to_file(data, machine, point, procMode, timestamp, is_wave=True)
         
         # Mostrar información básica
-        formatted_date = datetime.fromtimestamp(date).strftime("%Y-%m-%dT%H:%M:%S")
+        formatted_date = datetime.fromtimestamp(timestamp).strftime(
+            "%Y-%m-%dT%H:%M:%S"
+        )
         print("Onda descargada exitosamente:")
         print(f"   Machine: {machine}")
         print(f"   Point: {point}")
         print(f"   Mode: {procMode}")
-        print(f"   Timestamp: {date}")
+        print(f"   Timestamp: {timestamp}")
         print(f"   Fecha: {formatted_date}")
         
         # Devolver los datos de la onda
@@ -234,21 +354,15 @@ class T8ApiClient:
             dict | None: Datos del espectro o None si hay error
         """
         try:
-            if "T" in str(date):
-                # Hay que pasar a UTC
-                dt = datetime.fromisoformat(str(date))
-                dt = dt.astimezone(UTC)
-                date = int(dt.timestamp())
-            else:
-                date = int(date)
-        except ValueError:
-            print("Error de formato:ISO 8601 (YYYY-MM-DDTHH:MM:SS) o timestamp entero.")
+            timestamp = self._parse_date_to_timestamp(date)
+        except ValueError as e:
+            print(str(e))
             return None
         
         try:
             # Construir URL para obtener la onda específica
             url = (BASE_URL + "spectra/" + machine + "/" + point + "/" + 
-                   procMode + "/" + str(date))
+                   procMode + "/" + str(timestamp))
             response = self.session.get(url)
             data = self.check_ok_response(response)
             
@@ -256,15 +370,17 @@ class T8ApiClient:
                 return None
             
             # Guardar en archivo JSON
-            self.save_to_file(data, machine, point, procMode, date, is_wave=False)
+            self.save_to_file(data, machine, point, procMode, timestamp, is_wave=False)
             
             # Mostrar información básica
-            formatted_date = datetime.fromtimestamp(date).strftime("%Y-%m-%dT%H:%M:%S")
+            formatted_date = datetime.fromtimestamp(timestamp).strftime(
+                "%Y-%m-%dT%H:%M:%S"
+            )
             print("Espectro descargado exitosamente:")
             print(f"   Machine: {machine}")
             print(f"   Point: {point}")
             print(f"   Mode: {procMode}")
-            print(f"   Timestamp: {date}")
+            print(f"   Timestamp: {timestamp}")
             print(f"   Fecha: {formatted_date}")
             
             return data
@@ -331,7 +447,7 @@ class T8ApiClient:
             date: Fecha/timestamp de la onda
             save_file: Ruta para guardar el gráfico (opcional)
         """
-        matplotlib.use("WebAgg")
+        self._setup_matplotlib_interactive()
         print(f"Obteniendo onda para {machine}:{point}:{procMode}...")
         wave_data = self.get_wave(machine, point, procMode, date)
         if not wave_data:
@@ -361,7 +477,6 @@ class T8ApiClient:
         
         print("Generando gráfico...")
         
-        # Configurar matplotlib para mostrar gráficos interactivos en WSL
         # Crear el gráfico
         plt.figure(figsize=(14, 8))
         plt.plot(times, samples, "b-", linewidth=0.8)
@@ -385,27 +500,8 @@ class T8ApiClient:
             bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8)
         )
         
-        plt.tight_layout()
-        
-        # Guardar el gráfico
-        if save_file:
-            plt.savefig(save_file, dpi=300, bbox_inches="tight")
-            print(f"✓ Gráfico guardado en: {save_file}")
-        else:
-            # Guardar automáticamente en data/plots/
-            filename = f"wave_{machine}_{point}_{procMode}_plot.png"
-            auto_save = get_plot_filename(filename)
-            plt.savefig(auto_save, dpi=300, bbox_inches="tight")
-            print(f"✓ Gráfico guardado en: {auto_save}")
-        
-        # Mostrar el gráfico interactivo
-        try:
-            print("📊 Mostrando gráfico interactivo...")
-            print("   (Cierra la ventana para continuar)")
-            plt.show()  # Esto abrirá una ventana interactiva
-        except Exception as e:
-            print(f"⚠️  No se pudo mostrar gráfico interactivo: {e}")
-            print("   Gráfico guardado correctamente en archivo.")
+        # Guardar y mostrar el gráfico
+        self._save_and_show_plot(machine, point, procMode, "wave", save_file)
         
         print("✓ Gráfico generado exitosamente")
         print(f"  - {len(samples)} muestras a {sample_rate} Hz")
@@ -423,9 +519,7 @@ class T8ApiClient:
             date: Fecha/timestamp del espectro
             save_file: Ruta para guardar el gráfico (opcional)
         """
-        
-        # Configurar matplotlib para mostrar gráficos interactivos en WSL
-        matplotlib.use("WebAgg")
+        self._setup_matplotlib_interactive()
         print(f"Obteniendo espectro para {machine}:{point}:{procMode}...")
         spec_data = self.get_spectrum(machine, point, procMode, date)
         if not spec_data:
@@ -481,27 +575,8 @@ class T8ApiClient:
             bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8)
         )
         
-        plt.tight_layout()
-        
-        # Guardar el gráfico
-        if save_file:
-            plt.savefig(save_file, dpi=300, bbox_inches="tight")
-            print(f"✓ Gráfico guardado en: {save_file}")
-        else:
-            # Guardar automáticamente en data/plots/
-            filename = f"spectrum_{machine}_{point}_{procMode}_plot.png"
-            auto_save = get_plot_filename(filename)
-            plt.savefig(auto_save, dpi=300, bbox_inches="tight")
-            print(f"✓ Gráfico guardado en: {auto_save}")
-        
-        # Mostrar el gráfico interactivo
-        try:
-            print("📊 Mostrando gráfico interactivo...")
-            print("   (Cierra la ventana para continuar)")
-            plt.show()  # Esto abrirá una ventana interactiva
-        except Exception as e:
-            print(f"⚠️  No se pudo mostrar gráfico interactivo: {e}")
-            print("   Gráfico guardado correctamente en archivo.")
+        # Guardar y mostrar el gráfico
+        self._save_and_show_plot(machine, point, procMode, "spectrum", save_file)
         
         print("✓ Gráfico generado exitosamente")
         print(f"  - {num_samples} muestras")
@@ -530,42 +605,19 @@ class T8ApiClient:
         waveform = data.get("data")
         waveform = self.decode_data(waveform, data.get("factor", 1.0))
         
-        # Extraer información del path
-        path = data.get("path", "Unknown:Unknown:Unknown").split(":")
-        machine_name = path[0] if len(path) > 0 else "Unknown"
-        point = path[1] if len(path) > 1 else "Unknown"
-        proc_mode = path[2] if len(path) > 2 else "Unknown"
+        # Extraer información del path usando la función auxiliar
+        path = data.get("path", "Unknown:Unknown:Unknown")
+        machine_name, point, proc_mode = self._parse_machine_path(path)
         
         # Si no se proporcionan fmin/fmax, intentar obtenerlos de la API
         if fmin is None or fmax is None:
-            try:
-                url = BASE_URL + "confs/0"
-                response = self.session.get(url)
-                conf_data = self.check_ok_response(response)
-                
-                if conf_data:
-                    machines = conf_data.get("machines", [])
-                    for machine in machines:
-                        if machine.get("name") == machine_name:
-                            points = machine.get("points", [])
-                            for p in points:
-                                if p.get("name") == point:
-                                    proc_modes = p.get("proc_modes", [])
-                                    for mode in proc_modes:
-                                        if mode.get("name") == proc_mode:
-                                            sample_rate = mode.get("sample_rate", 1)
-                                            if fmin is None:
-                                                fmin = mode.get("min_freq", 0)
-                                            if fmax is None:
-                                                fmax = mode.get(
-                                                    "max_freq", sample_rate/2
-                                                )
-                                            break
-                                    break
-                            break
-            except Exception:
-                # Si falla la API, usar valores por defecto
-                pass
+            mode_config = self._get_machine_config(machine_name, point, proc_mode)
+            if mode_config:
+                sample_rate = mode_config.get("sample_rate", 1)
+                if fmin is None:
+                    fmin = mode_config.get("min_freq", 0)
+                if fmax is None:
+                    fmax = mode_config.get("max_freq", sample_rate/2)
         
         # Valores por defecto si no se pudieron obtener de la API
         sample_rate = data.get("sample_rate", 1)
@@ -595,106 +647,69 @@ class T8ApiClient:
         return frequencies, amplitudes, metadata
 
     def compute_spectrum_with_json(self, wave_filepath: str) -> None:
-        #Primero hay que sacar el contenido del archivo y transformarlo 
-        #en un objeto de python
-        with open(wave_filepath) as f:
-            data = json.load(f)
-        #Luego tengo que sacar los datos de:
-            #waveform: The input signal waveform. Lo único que se puede sacar de la onda
-            #sample_rate: The sampling rate of the waveform in Hz.
-            #fmin: The minimum frequency of interest in Hz.
-            #fmax: The maximum frequency of interest in Hz.
-
-        #Se que el campo "data" es la forma de onda
-        waveform = data.get("data")
-        #Procesamos data para descomprimir y decodificar
-        waveform = self.decode_data(waveform, data.get("factor", 1.0))
-        #Ahora tenemos que sacar sample_rate, fmin y fmax
-        path = data.get("path").split(":")
-        machine_name = path[0]
-        point = path[1]
-        proc_mode = path[2]
-        #Tenemos que sacar de la api el resto de datos
-        #Para eso vamos a navegar a confs, luego a la 0 que es la actual
-        url = (BASE_URL + "confs/0" )
-        response = self.session.get(url)
-        data = self.check_ok_response(response)
-        machines = data.get("machines", [])
-        for machine in machines:
-            if machine.get("name") == machine_name:
-                points = machine.get("points", [])
-                for p in points:
-                    if p.get("name") == point:
-                        proc_modes = p.get("proc_modes", [])
-                        for mode in proc_modes:
-                            if mode.get("name") == proc_mode:
-                                #Ahora extraemos un array con jsons de los parámetros
-                                sample_rate = mode.get("sample_rate", 1)
-                                max_freq = mode.get("max_freq", 250)  # Hz
-                                min_freq = mode.get("min_freq", 0.625)  # Hz
-
-                                #Y de ahí sacamos fmin, fmax
-                                print(f"Calculando espectropara {machine_name}:{point}:{proc_mode}...")  # noqa: E501
-                                print(f"  - Sample rate: {sample_rate} Hz")
-                                print(f"  - Fmin: {min_freq} Hz")
-                                print(f"  - Fmax: {max_freq} Hz")
-                                filtered_freqs, filtered_spectrum = T8ApiClient.compute_spectrum(waveform, sample_rate, min_freq, max_freq)  # noqa: E501
-                                #Ahora tenemos que hacer el gráfico
-                                matplotlib.use("WebAgg")
-                                plt.figure(figsize=(14, 8))
-                                plt.plot(filtered_freqs, filtered_spectrum, "b-", linewidth=0.8) # noqa: E501
-                                plt.title(
-                                    f"Espectro Computado - {machine_name}:{point}:{proc_mode}",  # noqa: E501
-                                    fontsize=14, fontweight="bold"
-                                )
-                                plt.xlabel("Frecuencia (Hz)", fontsize=12)
-                                plt.ylabel("Amplitud", fontsize=12)
-                                plt.grid(True, alpha=0.3)
-                                
-                                # Añadir información en el gráfico
-                                info_text = (
-                                    f"Muestras: {len(filtered_spectrum)}\n"
-                                    f"Rango freq: {min_freq}-{max_freq} Hz\n"
-                                    f"Sample rate: {sample_rate} Hz"
-                                )
-                                plt.text(
-                                    0.02, 0.98, info_text, 
-                                    transform=plt.gca().transAxes, 
-                                    verticalalignment="top", 
-                                    bbox=dict(
-                                        boxstyle="round", 
-                                        facecolor="wheat", 
-                                        alpha=0.8
-                                    )
-                                )
-                                
-                                plt.tight_layout()
-                                
-                                # Guardar el gráfico automáticamente en data/plots/
-                                filename = (
-                                    f"spectrum_{machine_name}_{point}_"
-                                    f"{proc_mode}_computed_plot.png"
-                                )
-                                auto_save = get_plot_filename(filename)
-                                plt.savefig(auto_save, dpi=300, bbox_inches="tight")
-                                print(f"✓ Gráfico guardado en: {auto_save}")
-                                
-                                # Mostrar el gráfico interactivo
-                                try:
-                                    print("📊 Mostrando gráfico interactivo...")
-                                    print("   (Cierra la ventana para continuar)")
-                                    plt.show()  # Esto abrirá una ventana interactiva
-                                except Exception as e:
-                                    print(f"⚠️  No se pudo mostrar gráfico: {e}")
-                                    print("   Gráfico guardado en archivo.")
-                                
-                                print("✓ Espectro computado exitosamente")
-                                print(f"  - {len(filtered_spectrum)} puntos freq")
-                                print(f"  - Frecuencia: {min_freq:.1f} - {max_freq:.1f} Hz")  # noqa: E501
-                                min_val = min(filtered_spectrum)
-                                max_val = max(filtered_spectrum)
-                                print(f"  - Rango: {min_val:.6f} a {max_val:.6f}")
-                                return
+        """
+        Calcula y muestra un espectro a partir de un archivo de onda JSON.
+        
+        Args:
+            wave_filepath: Ruta al archivo JSON de la onda
+        """
+        # Usar la función refactorizada para obtener datos del espectro
+        frequencies, amplitudes, metadata = self.compute_spectrum_from_wave_data(
+            wave_filepath
+        )
+        
+        machine_name = metadata["machine"]
+        point = metadata["point"]
+        proc_mode = metadata["proc_mode"]
+        min_freq = metadata["min_freq"]
+        max_freq = metadata["max_freq"]
+        sample_rate = metadata["sample_rate"]
+        
+        print(f"Calculando espectro para {machine_name}:{point}:{proc_mode}...")
+        print(f"  - Sample rate: {sample_rate} Hz")
+        print(f"  - Fmin: {min_freq} Hz")
+        print(f"  - Fmax: {max_freq} Hz")
+        
+        # Configurar matplotlib y crear gráfico
+        self._setup_matplotlib_interactive()
+        plt.figure(figsize=(14, 8))
+        plt.plot(frequencies, amplitudes, "b-", linewidth=0.8)
+        plt.title(
+            f"Espectro Computado - {machine_name}:{point}:{proc_mode}",
+            fontsize=14, fontweight="bold"
+        )
+        plt.xlabel("Frecuencia (Hz)", fontsize=12)
+        plt.ylabel("Amplitud", fontsize=12)
+        plt.grid(True, alpha=0.3)
+        
+        # Añadir información en el gráfico
+        info_text = (
+            f"Muestras: {len(amplitudes)}\n"
+            f"Rango freq: {min_freq}-{max_freq} Hz\n"
+            f"Sample rate: {sample_rate} Hz"
+        )
+        plt.text(
+            0.02, 0.98, info_text, 
+            transform=plt.gca().transAxes, 
+            verticalalignment="top", 
+            bbox=dict(
+                boxstyle="round", 
+                facecolor="wheat", 
+                alpha=0.8
+            )
+        )
+        
+        # Guardar y mostrar el gráfico
+        self._save_and_show_plot(
+            machine_name, point, proc_mode, "spectrum", suffix="_computed"
+        )
+        
+        print("✓ Espectro computado exitosamente")
+        print(f"  - {len(amplitudes)} puntos freq")
+        print(f"  - Frecuencia: {min_freq:.1f} - {max_freq:.1f} Hz")
+        min_val = min(amplitudes)
+        max_val = max(amplitudes)
+        print(f"  - Rango: {min_val:.6f} a {max_val:.6f}")
 
     @staticmethod
     def compute_spectrum(

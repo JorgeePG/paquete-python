@@ -14,6 +14,8 @@ dependencies = [
     "python-dotenv",
     "tornado>=6.5.2",
     "datetime",
+    "responses",
+    "requests_mock",
 ]
 
 [build-system]
@@ -22,6 +24,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/t8-client"]
+pythonpath = ["src/t8-client"]
 
 [project.scripts]
 t8-cli = "src.t8-client.cli:cli"
