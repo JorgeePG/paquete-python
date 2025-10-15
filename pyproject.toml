@@ -32,6 +32,7 @@ t8-cli = "src.t8-client.cli:cli"
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
     "ruff>=0.14.0",
 ]
 

@@ -277,31 +277,36 @@ class T8ApiClient:
             print(str(e))
             return None
         
-        # Construir URL para obtener la onda específica
-        url = (BASE_URL + "waves/" + machine + "/" + point + "/" + 
-               procMode + "/" + str(timestamp))
-        response = self.session.get(url)
-        data = self.check_ok_response(response)
-        
-        if not data:
+        try:
+            # Construir URL para obtener la onda específica
+            url = (BASE_URL + "waves/" + machine + "/" + point + "/" + 
+                   procMode + "/" + str(timestamp))
+            response = self.session.get(url)
+            data = self.check_ok_response(response)
+            
+            if not data:
+                return None
+            
+            # Guardar en archivo JSON
+            self.save_to_file(data, machine, point, procMode, timestamp, is_wave=True)
+            
+            # Mostrar información básica
+            formatted_date = datetime.fromtimestamp(timestamp).strftime(
+                "%Y-%m-%dT%H:%M:%S"
+            )
+            print("Onda descargada exitosamente:")
+            print(f"   Machine: {machine}")
+            print(f"   Point: {point}")
+            print(f"   Mode: {procMode}")
+            print(f"   Timestamp: {timestamp}")
+            print(f"   Fecha: {formatted_date}")
+            
+            # Devolver los datos de la onda
+            return data
+            
+        except Exception as e:
+            print(f"Error al obtener la onda: {e}")
             return None
-        
-        # Guardar en archivo JSON
-        self.save_to_file(data, machine, point, procMode, timestamp, is_wave=True)
-        
-        # Mostrar información básica
-        formatted_date = datetime.fromtimestamp(timestamp).strftime(
-            "%Y-%m-%dT%H:%M:%S"
-        )
-        print("Onda descargada exitosamente:")
-        print(f"   Machine: {machine}")
-        print(f"   Point: {point}")
-        print(f"   Mode: {procMode}")
-        print(f"   Timestamp: {timestamp}")
-        print(f"   Fecha: {formatted_date}")
-        
-        # Devolver los datos de la onda
-        return data
     
     def decode_data(self, encoded_data: str, factor: float = 1.0) -> list[float]:
         """
