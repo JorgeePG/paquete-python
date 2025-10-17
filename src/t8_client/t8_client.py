@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, UTC # type: ignore
+from datetime import datetime # type: ignore
 import base64
 import zlib
 import struct
@@ -50,12 +50,13 @@ class T8ApiClient:
         self.session = requests.Session()
         self.token = None
 
-    def _parse_date_to_timestamp(self, date: str | None) -> int:
+    def _parse_date_to_timestamp(self, date: str) -> int:
         """
         Convierte una fecha en formato ISO 8601 o timestamp a entero timestamp.
         
         Args:
-            date: Fecha en formato ISO 8601, timestamp, o None para la más reciente
+            date: Fecha en formato ISO 8601 (en hora local), timestamp, 
+                  o None para la más reciente
             
         Returns:
             int: Timestamp como entero
@@ -66,16 +67,15 @@ class T8ApiClient:
         try:
             if "T" in str(date):
                 dt = datetime.fromisoformat(str(date))
-                # Para spectrum necesitamos UTC
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=UTC)
-                dt = dt.astimezone(UTC)
+                # Si no tiene timezone, se trata como hora local
+                # y se convierte directamente a timestamp
                 return int(dt.timestamp())
             else:
                 return int(date)
         except ValueError as e:
             raise ValueError(
-                "Error de formato: ISO 8601 (YYYY-MM-DDTHH:MM:SS) o timestamp entero."
+                "Error de formato: No es ISO 8601 (YYYY-MM-DDTHH:MM:SS) "
+                                        "o timestamp entero."
             ) from e
 
     def _setup_matplotlib_interactive(self) -> None:
@@ -257,7 +257,7 @@ class T8ApiClient:
         return True
 
     def get_wave(self, machine: str, point: str, procMode: str, 
-                 date: str | None = "0") -> dict | None:
+                 date: str | int = 0) -> dict | None:
         """
         Obtiene una onda específica o la más reciente si no se especifica fecha.
         Guarda la onda en un archivo JSON y devuelve los datos de la onda.
@@ -344,7 +344,7 @@ class T8ApiClient:
             return []
 
     def get_spectrum(self, machine: str, point: str, procMode: str, 
-                 date: str | None = "0") -> dict | None:
+                 date: str | int = 0) -> dict | None:
         """
         Obtiene un espectro específico o el más reciente si no se especifica fecha.
         Guarda el espectro en un archivo JSON y devuelve los datos del espectro.
@@ -590,7 +590,7 @@ class T8ApiClient:
 
 
     def compute_spectrum_from_wave_data(
-        self, wave_filepath: str, fmin: float = None, fmax: float = None
+        self, wave_filepath: str
     ) -> tuple[np.ndarray, np.ndarray, dict]:
         """
         Calcula un espectro a partir de un archivo de onda JSON.
@@ -614,15 +614,13 @@ class T8ApiClient:
         path = data.get("path", "Unknown:Unknown:Unknown")
         machine_name, point, proc_mode = self._parse_machine_path(path)
         
-        # Si no se proporcionan fmin/fmax, intentar obtenerlos de la API
-        if fmin is None or fmax is None:
-            mode_config = self._get_machine_config(machine_name, point, proc_mode)
-            if mode_config:
-                sample_rate = mode_config.get("sample_rate", 1)
-                if fmin is None:
-                    fmin = mode_config.get("min_freq", 0)
-                if fmax is None:
-                    fmax = mode_config.get("max_freq", sample_rate/2)
+        fmin =None
+        fmax =None
+        mode_config = self._get_machine_config(machine_name, point, proc_mode)
+        if mode_config:
+            sample_rate = mode_config.get("sample_rate", 1)
+            fmin = mode_config.get("min_freq", 0)
+            fmax = mode_config.get("max_freq", sample_rate/2)
         
         # Valores por defecto si no se pudieron obtener de la API
         sample_rate = data.get("sample_rate", 1)

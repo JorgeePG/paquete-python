@@ -4,7 +4,7 @@ import pytest # type: ignore
 from click.testing import CliRunner # type: ignore
 import responses  # type: ignore
 
-from cli import (
+from t8_client import (
     cli,
     list_waves,
     list_spectra,
@@ -14,9 +14,9 @@ from cli import (
     plot_spectrum,
     list_all_waves,
     compute_spectrum,
-    compare_spectra
+    compare_spectra,
+    BASE_URL
 )
-from t8_client import BASE_URL
 
 
 @pytest.fixture
@@ -454,7 +454,7 @@ class TestPlotWave:
     """Tests for plot_wave CLI command."""
     
     @responses.activate
-    @patch("cli.T8ApiClient.plot_wave")
+    @patch("t8_client.cli.T8ApiClient.plot_wave")
     def test_plot_wave_success(
         self, mock_plot: Mock, runner: CliRunner, mock_env_credentials: None
     ) -> None:
@@ -478,7 +478,7 @@ class TestPlotWave:
         )
     
     @responses.activate
-    @patch("cli.T8ApiClient.plot_wave")
+    @patch("t8_client.cli.T8ApiClient.plot_wave")
     def test_plot_wave_with_timestamp(
         self, mock_plot: Mock, runner: CliRunner, mock_env_credentials: None
     ) -> None:
@@ -529,7 +529,7 @@ class TestPlotSpectrum:
     """Tests for plot_spectrum CLI command."""
     
     @responses.activate
-    @patch("cli.T8ApiClient.plot_spectrum")
+    @patch("t8_client.cli.T8ApiClient.plot_spectrum")
     def test_plot_spectrum_success(
         self, mock_plot: Mock, runner: CliRunner, mock_env_credentials: None
     ) -> None:
@@ -553,7 +553,7 @@ class TestPlotSpectrum:
         )
     
     @responses.activate
-    @patch("cli.T8ApiClient.plot_spectrum")
+    @patch("t8_client.cli.T8ApiClient.plot_spectrum")
     def test_plot_spectrum_with_date(
         self, mock_plot: Mock, runner: CliRunner, mock_env_credentials: None
     ) -> None:
@@ -647,7 +647,7 @@ class TestComputeSpectrum:
     """Tests for compute_spectrum CLI command."""
     
     @responses.activate
-    @patch("cli.T8ApiClient.compute_spectrum_with_json")
+    @patch("t8_client.cli.T8ApiClient.compute_spectrum_with_json")
     def test_compute_spectrum_success(
         self,
         mock_compute: Mock,

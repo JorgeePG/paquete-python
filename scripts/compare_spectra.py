@@ -105,7 +105,7 @@ def compute_spectrum_from_wave(
     
     # Usar el método existente del cliente
     frequencies, amplitudes, metadata = client.compute_spectrum_from_wave_data(
-        wave_file, fmin, fmax
+        wave_file
     )
     
     return frequencies, amplitudes, metadata
@@ -134,7 +134,7 @@ def compare_spectra(spectrum_file: str, wave_file: str, output_file: str = None)
         # Pasar metadata de API para usar mismo rango de frecuencias
         calc_freqs, calc_amplitudes, calc_metadata = compute_spectrum_from_wave(
             wave_file, api_metadata
-        )
+            )
         print(f"✓ Espectro calculado: {calc_metadata['num_samples']} puntos")
         print(f"  Rango: {calc_metadata['min_freq']:.1f} - {calc_metadata['max_freq']:.1f} Hz")  # noqa: E501
     except Exception as e:

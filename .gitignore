@@ -1,2 +1,58 @@
+# Environment variables
 *.env
+.env.local
+
+# Python
 *.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+clear/
+list/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Data files
+*.json
+data/
+*.csv
+*.xlsx
+*.xls
+
+# Plots and outputs
+*.png
+*.jpg
+*.jpeg
+*.pdf
+plots/
+
+# Build and distribution
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# OS
+.DS_Store
+Thumbs.db

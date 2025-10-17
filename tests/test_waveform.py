@@ -486,7 +486,7 @@ class TestSpectrumComputation:
         
         # Compute spectrum
         frequencies, amplitudes, metadata = client.compute_spectrum_from_wave_data(
-            wave_filepath, fmin=0, fmax=500
+            wave_filepath
         )
         
         assert len(frequencies) > 0
