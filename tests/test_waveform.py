@@ -17,7 +17,7 @@ class TestHelperFunctions:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test that plots directory is created."""
-        # Cambiar al directorio temporal
+        # Change to temporary directory
         monkeypatch.chdir(tmp_path)
 
         plots_dir = ensure_plots_directory()

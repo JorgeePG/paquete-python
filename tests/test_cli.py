@@ -92,7 +92,7 @@ class TestListWaves:
         )
 
         assert result.exit_code == 0
-        assert "No se pudo autenticar" in result.output
+        assert "Could not authenticate" in result.output
 
     def test_list_waves_no_credentials(
         self, runner: CliRunner, mock_env_no_credentials: None
@@ -103,7 +103,7 @@ class TestListWaves:
         )
 
         assert result.exit_code == 0
-        assert "No se encontraron credenciales" in result.output
+        assert "Credentials not found" in result.output
 
     def test_list_waves_missing_required_options(self, runner: CliRunner) -> None:
         """Test wave listing with missing required options."""
@@ -165,7 +165,7 @@ class TestListSpectra:
         )
 
         assert result.exit_code == 0
-        assert "No se pudo autenticar" in result.output
+        assert "Could not authenticate" in result.output
 
     def test_list_spectra_no_credentials(
         self, runner: CliRunner, mock_env_no_credentials: None
@@ -176,7 +176,7 @@ class TestListSpectra:
         )
 
         assert result.exit_code == 0
-        assert "No se encontraron credenciales" in result.output
+        assert "Credentials not found" in result.output
 
 
 class TestGetWave:
@@ -322,7 +322,7 @@ class TestGetWave:
         )
 
         assert result.exit_code == 0
-        assert "No se pueden especificar tanto --date como --timestamp" in result.output
+        assert "Cannot specify both --date and --timestamp" in result.output
 
     @responses.activate
     def test_get_wave_auth_failure(
@@ -342,7 +342,7 @@ class TestGetWave:
         )
 
         assert result.exit_code == 0
-        assert "No se pudo autenticar" in result.output
+        assert "Could not authenticate" in result.output
 
 
 class TestGetSpectrum:
@@ -457,7 +457,7 @@ class TestGetSpectrum:
         )
 
         assert result.exit_code == 0
-        assert "No se pueden especificar tanto --date como --timestamp" in result.output
+        assert "Cannot specify both --date and --timestamp" in result.output
 
 
 class TestPlotWave:
@@ -540,7 +540,7 @@ class TestPlotWave:
         )
 
         assert result.exit_code == 0
-        assert "No se pueden especificar tanto --date como --timestamp" in result.output
+        assert "Cannot specify both --date and --timestamp" in result.output
 
 
 class TestPlotSpectrum:
@@ -652,7 +652,7 @@ class TestListAllWaves:
         result = runner.invoke(list_all_waves)
 
         assert result.exit_code == 0
-        assert "No se pudo autenticar" in result.output
+        assert "Could not authenticate" in result.output
 
     def test_list_all_waves_no_credentials(
         self, runner: CliRunner, mock_env_no_credentials: None
@@ -661,7 +661,7 @@ class TestListAllWaves:
         result = runner.invoke(list_all_waves)
 
         assert result.exit_code == 0
-        assert "No se encontraron credenciales" in result.output
+        assert "Credentials not found" in result.output
 
 
 class TestComputeSpectrum:
@@ -714,7 +714,7 @@ class TestComputeSpectrum:
         result = runner.invoke(compute_spectrum, [str(wave_file)])
 
         assert result.exit_code == 0
-        assert "No se pudo autenticar" in result.output
+        assert "Could not authenticate" in result.output
 
     def test_compute_spectrum_file_not_found(
         self, runner: CliRunner, mock_env_credentials: None
@@ -805,7 +805,7 @@ class TestCompareSpectra:
 
         assert result.exit_code == 0
         assert (
-            "falló con código" in result.output
+            "failed with code" in result.output
             or "Error in comparison" in result.output
         )
 
@@ -826,7 +826,7 @@ class TestCompareSpectra:
         result = runner.invoke(compare_spectra, [str(spectrum_file), str(wave_file)])
 
         assert result.exit_code == 0
-        assert "Error ejecutando script" in result.output
+        assert "Error executing script" in result.output
 
 
 class TestCLIGroup:
@@ -837,7 +837,7 @@ class TestCLIGroup:
         result = runner.invoke(cli, ["--help"])
 
         assert result.exit_code == 0
-        assert "CLI para interactuar con la API T8" in result.output
+        assert "CLI to interact with the T8 API" in result.output
 
     def test_cli_command_list(self, runner: CliRunner) -> None:
         """Test that all commands are listed."""

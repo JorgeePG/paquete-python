@@ -12,22 +12,22 @@ import numpy as np  # type: ignore
 import requests  # type: ignore
 from dotenv import load_dotenv  # type: ignore
 
-matplotlib.use("Agg")  # Backend sin GUI por defecto
+matplotlib.use("Agg")  # Non-GUI backend by default
 
-# Cargar variables de entorno
+# Load environment variables
 load_dotenv()
 
-# Configurar BASE_URL con fallback
+# Configure BASE_URL with fallback
 T8_HOST = os.getenv("T8_HOST", "https://lzfs45.mirror.twave.io/lzfs45")
 BASE_URL = T8_HOST + "/rest/"
 
 
 def ensure_plots_directory() -> str:
     """
-    Crea el directorio data/plots si no existe y devuelve la ruta.
+    Creates the data/plots directory if it doesn't exist and returns the path.
 
     Returns:
-        str: Ruta al directorio data/plots
+        str: Path to the data/plots directory
     """
     plots_dir = os.path.join("data", "plots")
     os.makedirs(plots_dir, exist_ok=True)
@@ -36,13 +36,13 @@ def ensure_plots_directory() -> str:
 
 def get_plot_filename(filename: str) -> str:
     """
-    Genera una ruta completa para un archivo de gráfico en data/plots/
+    Generates a complete path for a plot file in data/plots/
 
     Args:
-        filename: Nombre del archivo (ej: "wave_machine_plot.png")
+        filename: File name (e.g.: "wave_machine_plot.png")
 
     Returns:
-        str: Ruta completa al archivo (ej: "data/plots/wave_machine_plot.png")
+        str: Complete path to the file (e.g.: "data/plots/wave_machine_plot.png")
     """
     plots_dir = ensure_plots_directory()
     return os.path.join(plots_dir, filename)
@@ -55,34 +55,33 @@ class T8ApiClient:
 
     def _parse_date_to_timestamp(self, date: str) -> int:
         """
-        Convierte una fecha en formato ISO 8601 o timestamp a entero timestamp.
+        Converts a date in ISO 8601 format or timestamp to an integer timestamp.
 
         Args:
-            date: Fecha en formato ISO 8601 (en hora local), timestamp,
-                  o None para la más reciente
+            date: Date in ISO 8601 format (in local time), timestamp,
+                  or None for the most recent
 
         Returns:
-            int: Timestamp como entero
+            int: Timestamp as an integer
 
         Raises:
-            ValueError: Si el formato de fecha es inválido
+            ValueError: If the date format is invalid
         """
         try:
             if "T" in str(date):
                 dt = datetime.fromisoformat(str(date))
-                # Si no tiene timezone, se trata como hora local
-                # y se convierte directamente a timestamp
+                # If no timezone, treat as local time
+                # and convert directly to timestamp
                 return int(dt.timestamp())
             else:
                 return int(date)
         except ValueError as e:
             raise ValueError(
-                "Error de formato: No es ISO 8601 (YYYY-MM-DDTHH:MM:SS) "
-                "o timestamp entero."
+                "Format error: Not ISO 8601 (YYYY-MM-DDTHH:MM:SS) or integer timestamp."
             ) from e
 
     def _setup_matplotlib_interactive(self) -> None:
-        """Configura matplotlib para mostrar gráficos interactivos."""
+        """Configures matplotlib to display interactive plots."""
         matplotlib.use("WebAgg")
 
     def _save_and_show_plot(
@@ -95,44 +94,44 @@ class T8ApiClient:
         suffix: str = "",
     ) -> None:
         """
-        Guarda y muestra un gráfico de matplotlib.
+        Saves and displays a matplotlib plot.
 
         Args:
-            machine: ID de la máquina
-            point: Punto de medida
-            procMode: Modo de procesamiento
-            plot_type: Tipo de gráfico ('wave', 'spectrum')
-            save_file: Ruta personalizada para guardar (opcional)
-            suffix: Sufijo adicional para el nombre del archivo
+            machine: Machine ID
+            point: Measurement point
+            procMode: Processing mode
+            plot_type: Plot type ('wave', 'spectrum')
+            save_file: Custom path to save (optional)
+            suffix: Additional suffix for the filename
         """
         plt.tight_layout()
 
-        # Guardar el gráfico
+        # Save the plot
         if save_file:
             plt.savefig(save_file, dpi=300, bbox_inches="tight")
-            print(f"✓ Gráfico guardado en: {save_file}")
+            print(f"✓ Plot saved to: {save_file}")
         else:
-            # Guardar automáticamente en data/plots/
+            # Automatically save to data/plots/
             filename = f"{plot_type}_{machine}_{point}_{procMode}{suffix}_plot.png"
             auto_save = get_plot_filename(filename)
             plt.savefig(auto_save, dpi=300, bbox_inches="tight")
-            print(f"✓ Gráfico guardado en: {auto_save}")
+            print(f"✓ Plot saved to: {auto_save}")
 
-        # Mostrar el gráfico interactivo
+        # Show interactive plot
         try:
-            print("📊 Mostrando gráfico interactivo...")
-            print("   (Cierra la ventana para continuar)")
+            print("📊 Displaying interactive plot...")
+            print("   (Close the window to continue)")
             plt.show()
         except Exception as e:
-            print(f"⚠️  No se pudo mostrar gráfico interactivo: {e}")
-            print("   Gráfico guardado correctamente en archivo.")
+            print(f"⚠️  Could not display interactive plot: {e}")
+            print("   Plot saved correctly to file.")
 
     def _parse_machine_path(self, path: str) -> tuple[str, str, str]:
         """
-        Parsea un path de máquina y extrae machine, point y proc_mode.
+        Parses a machine path and extracts machine, point and proc_mode.
 
         Args:
-            path: Path en formato "machine:point:proc_mode"
+            path: Path in format "machine:point:proc_mode"
 
         Returns:
             tuple: (machine, point, proc_mode)
@@ -147,15 +146,15 @@ class T8ApiClient:
         self, machine_name: str, point: str, proc_mode: str
     ) -> dict | None:
         """
-        Obtiene la configuración de una máquina específica desde la API.
+        Gets the configuration of a specific machine from the API.
 
         Args:
-            machine_name: Nombre de la máquina
-            point: Punto de medida
-            proc_mode: Modo de procesamiento
+            machine_name: Machine name
+            point: Measurement point
+            proc_mode: Processing mode
 
         Returns:
-            dict | None: Configuración de la máquina o None si no se encuentra
+            dict | None: Machine configuration or None if not found
         """
         try:
             url = BASE_URL + "confs/0"
@@ -180,28 +179,28 @@ class T8ApiClient:
             return None
 
     def login_with_credentials(self, username: str, password: str) -> bool:
-        # Primero obtenemos la página de login para obtener cualquier token CSRF
+        # First get the login page to obtain any CSRF token
         login_page_url = "https://lzfs45.mirror.twave.io/lzfs45/signin"
 
-        # Hacemos login usando form data como el navegador
+        # Login using form data like a browser
         payload = {"username": username, "password": password, "signin": "Sign In"}
 
         try:
             response = self.session.post(login_page_url, data=payload)
-            # Si el login es exitoso, probablemente nos redirige o nos da una cookie
+            # If login is successful, it probably redirects us or gives us a cookie
             if (
                 response.status_code == 200
                 and "Invalid Username or Password" not in response.text
             ):
                 return True
             elif "Invalid Username or Password" in response.text:
-                print("Error: Credenciales inválidas")
+                print("Error: Invalid credentials")
                 return False
             else:
-                print(f"Error de login: {response.status_code} - {response.text[:100]}")
+                print(f"Login error: {response.status_code} - {response.text[:100]}")
                 return False
         except Exception as e:
-            print(f"Error en la petición de login: {e}")
+            print(f"Error in login request: {e}")
             return False
 
     def check_ok_response(self, response: requests.Response) -> dict | None:
@@ -223,16 +222,16 @@ class T8ApiClient:
         if not data:
             return
 
-        # Saco los url de las máquinas con sus puntos y modos de procesamiento
+        # Extract URLs of machines with their points and processing modes
         waves = data.get("_items", [])
-        print(f"\nEncontradas {len(waves)} ondas disponibles:\n")
+        print(f"\nFound {len(waves)} available waves:\n")
 
         for i, wave in enumerate(waves, 1):
-            # Extraer información del URL
+            # Extract information from URL
             wave_url = wave.get("_links", {}).get("self", "")
             if wave_url:
-                # Extraer machine, point, mode del URL
-                # Formato esperado: .../waves/MACHINE/POINT/MODE/
+                # Extract machine, point, mode from URL
+                # Expected format: .../waves/MACHINE/POINT/MODE/
                 parts = wave_url.rstrip("/").split("/")
                 if len(parts) >= 3:
                     machine = parts[-3]
@@ -245,13 +244,13 @@ class T8ApiClient:
 
     def _get_timestamp_from_item(self, item: dict) -> int:
         """
-        Extrae el timestamp de un item (wave o spectrum) desde su URL.
+        Extracts the timestamp from an item (wave or spectrum) from its URL.
 
         Args:
-            item: Diccionario con la información del item
+            item: Dictionary with item information
 
         Returns:
-            int: Timestamp extraído del URL, o -1 si no se puede extraer
+            int: Timestamp extracted from URL, or -1 if it cannot be extracted
         """
         item_url = item.get("_links", {}).get("self", "")
         try:
@@ -266,7 +265,7 @@ class T8ApiClient:
         if not data:
             return False
         for wave in data.get("_items", []):
-            # Filtrar los que tienen timestamp = 0
+            # Filter those with timestamp = 0
             if self._get_timestamp_from_item(wave) != 0:
                 print(self.get_timestamp_and_formatted_wave_date(wave))
         return True
@@ -278,7 +277,7 @@ class T8ApiClient:
         if not data:
             return False
         for spectrum in data.get("_items", []):
-            # Filtrar los que tienen timestamp = 0
+            # Filter those with timestamp = 0
             if self._get_timestamp_from_item(spectrum) != 0:
                 print(self.get_timestamp_and_formatted_wave_date(spectrum))
         return True
@@ -287,17 +286,17 @@ class T8ApiClient:
         self, machine: str, point: str, procMode: str, date: str | int = 0
     ) -> dict | None:
         """
-        Obtiene una onda específica o la más reciente si no se especifica fecha.
-        Guarda la onda en un archivo JSON y devuelve los datos de la onda.
+        Gets a specific wave or the most recent one if no date is specified.
+        Saves the wave to a JSON file and returns the wave data.
 
         Args:
-            machine: ID de la máquina
-            point: Punto de medida
-            procMode: Modo de procesamiento
-            date: Fecha en formato ISO 8601, timestamp, o None para la más reciente
+            machine: Machine ID
+            point: Measurement point
+            procMode: Processing mode
+            date: Date in ISO 8601 format, timestamp, or None for the most recent
 
         Returns:
-            dict | None: Datos de la onda o None si hay error
+            dict | None: Wave data or None if there's an error
         """
         try:
             timestamp = self._parse_date_to_timestamp(date)
@@ -306,7 +305,7 @@ class T8ApiClient:
             return None
 
         try:
-            # Construir URL para obtener la onda específica
+            # Build URL to get specific wave
             url = (
                 BASE_URL
                 + "waves/"
@@ -324,77 +323,77 @@ class T8ApiClient:
             if not data:
                 return None
 
-            # Guardar en archivo JSON
+            # Save to JSON file
             self.save_to_file(data, machine, point, procMode, timestamp, is_wave=True)
 
-            # Mostrar información básica
+            # Display basic information
             formatted_date = datetime.fromtimestamp(timestamp).strftime(
                 "%Y-%m-%dT%H:%M:%S"
             )
-            print("Onda descargada exitosamente:")
+            print("Wave downloaded successfully:")
             print(f"   Machine: {machine}")
             print(f"   Point: {point}")
             print(f"   Mode: {procMode}")
             print(f"   Timestamp: {timestamp}")
-            print(f"   Fecha: {formatted_date}")
+            print(f"   Date: {formatted_date}")
 
-            # Devolver los datos de la onda
+            # Return wave data
             return data
 
         except Exception as e:
-            print(f"Error al obtener la onda: {e}")
+            print(f"Error getting wave: {e}")
             return None
 
     def decode_data(self, encoded_data: str, factor: float = 1.0) -> list[float]:
         """
-        Decodifica los datos de onda comprimidos en base64 + zlib.
-        Usa int16 little-endian que es el formato que mejor funciona.
+        Decodes compressed wave data in base64 + zlib.
+        Uses int16 little-endian which is the format that works best.
 
         Args:
-            encoded_data: Datos codificados en base64
-            factor: Factor de escala a aplicar a los datos
+            encoded_data: Data encoded in base64
+            factor: Scaling factor to apply to data
 
         Returns:
-            list[float]: Array de muestras decodificadas
+            list[float]: Array of decoded samples
         """
         try:
-            # Decodificar base64
+            # Decode base64
             compressed_data = base64.b64decode(encoded_data)
 
-            # Descomprimir con zlib
+            # Decompress with zlib
             decompressed_data = zlib.decompress(compressed_data)
 
-            # Convertir a valores int16 little-endian
+            # Convert to int16 little-endian values
             sample_count = len(decompressed_data) // 2
             samples = struct.unpack(f"<{sample_count}h", decompressed_data)
 
-            # Aplicar factor de escala
+            # Apply scaling factor
             scaled_samples = [sample * factor for sample in samples]
 
-            print(f"Decodificados {len(scaled_samples)} muestras (int16 little-endian)")
-            print(f"Rango: {min(scaled_samples):.2f} a {max(scaled_samples):.2f}")
+            print(f"Decoded {len(scaled_samples)} samples (int16 little-endian)")
+            print(f"Range: {min(scaled_samples):.2f} to {max(scaled_samples):.2f}")
 
             return scaled_samples
 
         except Exception as e:
-            print(f"Error decodificando datos de onda: {e}")
+            print(f"Error decoding wave data: {e}")
             return []
 
     def get_spectrum(
         self, machine: str, point: str, procMode: str, date: str | int = 0
     ) -> dict | None:
         """
-        Obtiene un espectro específico o el más reciente si no se especifica fecha.
-        Guarda el espectro en un archivo JSON y devuelve los datos del espectro.
+        Gets a specific spectrum or the most recent one if no date is specified.
+        Saves the spectrum to a JSON file and returns the spectrum data.
 
         Args:
-            machine: ID de la máquina
-            point: Punto de medida
-            procMode: Modo de procesamiento
-            date: Fecha en formato ISO 8601, timestamp, o None para la más reciente
+            machine: Machine ID
+            point: Measurement point
+            procMode: Processing mode
+            date: Date in ISO 8601 format, timestamp, or None for the most recent
 
         Returns:
-            dict | None: Datos del espectro o None si hay error
+            dict | None: Spectrum data or None if there's an error
         """
         try:
             timestamp = self._parse_date_to_timestamp(date)
@@ -403,7 +402,7 @@ class T8ApiClient:
             return None
 
         try:
-            # Construir URL para obtener la onda específica
+            # Build URL to get specific wave
             url = (
                 BASE_URL
                 + "spectra/"
@@ -421,24 +420,24 @@ class T8ApiClient:
             if not data:
                 return None
 
-            # Guardar en archivo JSON
+            # Save to JSON file
             self.save_to_file(data, machine, point, procMode, timestamp, is_wave=False)
 
-            # Mostrar información básica
+            # Display basic information
             formatted_date = datetime.fromtimestamp(timestamp).strftime(
                 "%Y-%m-%dT%H:%M:%S"
             )
-            print("Espectro descargado exitosamente:")
+            print("Spectrum downloaded successfully:")
             print(f"   Machine: {machine}")
             print(f"   Point: {point}")
             print(f"   Mode: {procMode}")
             print(f"   Timestamp: {timestamp}")
-            print(f"   Fecha: {formatted_date}")
+            print(f"   Date: {formatted_date}")
 
             return data
 
         except Exception as e:
-            print(f"Error al obtener el espectro: {e}")
+            print(f"Error getting spectrum: {e}")
             return None
 
     def save_to_file(
@@ -450,46 +449,46 @@ class T8ApiClient:
         timestamp: int,
         is_wave: bool,
     ) -> None:
-        """Guarda los datos en un archivo JSON."""
+        """Saves data to a JSON file."""
         import os
 
-        # Crear directorio data/waves si no existe
+        # Create data/waves directory if it doesn't exist
         if is_wave:
             os.makedirs("data/waves", exist_ok=True)
-            # Crear nombre del archivo:
+            # Create filename:
             # wave_<MACHINE>_<POINT>_<PROC_MODE>_<TIMESTAMP>.json
             filename = f"wave_{machine}_{point}_{procMode}_{timestamp}.json"
             filepath = os.path.join("data/waves", filename)
         else:
             os.makedirs("data/spectra", exist_ok=True)
-            # Crear nombre del archivo:
+            # Create filename:
             # spectrum_<MACHINE>_<POINT>_<PROC_MODE>_<TIMESTAMP>.json
             filename = f"spectrum_{machine}_{point}_{procMode}_{timestamp}.json"
             filepath = os.path.join("data/spectra", filename)
 
-        # Guardar datos en archivo JSON
+        # Save data to JSON file
         try:
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
-            print(f"   Archivo guardado: {filepath}")
+            print(f"   File saved: {filepath}")
         except Exception as e:
-            print(f"Error al guardar el archivo: {e}")
+            print(f"Error saving file: {e}")
 
     def get_timestamp_and_formatted_wave_date(self, wave: dict) -> str | None:
         url = wave.get("_links", {}).get("self")
-        # ahora parseo el url y saco la fecha
+        # now parse the url and extract the date
         url_parts = url.split("/")
-        fecha = url_parts[-1]  # Sabiendo que la fecha es el timestamp del final
-        # Ahora se le da un formato ISO 8601 al timestamp
-        # como esta de ejemplo: 2025-01-01T12:00:00
+        fecha = url_parts[-1]  # Knowing that the date is the timestamp at the end
+        # Now give ISO 8601 format to the timestamp
+        # like this example: 2025-01-01T12:00:00
         try:
-            # Convertir timestamp a entero y luego a datetime
+            # Convert timestamp to integer and then to datetime
             timestamp = int(fecha)
             fecha_formateada = datetime.fromtimestamp(timestamp).strftime(
                 "%Y-%m-%dT%H:%M:%S"
             )
         except (ValueError, OSError):
-            # Si hay error en la conversión, retornar el timestamp original
+            # If there's a conversion error, return the original timestamp
             fecha_formateada = fecha
         return fecha + " => " + fecha_formateada
 
@@ -501,62 +500,62 @@ class T8ApiClient:
         date: str | None = "0",
         save_file: str | None = None,
     ) -> None:
-        """Genera un gráfico de la onda usando matplotlib.
+        """Generates a wave plot using matplotlib.
 
         Args:
-            machine: ID de la máquina
-            point: Punto de medida
-            procMode: Modo de procesamiento
-            unit: Unidad de medida (ej: 'mm/s', 'g', 'm/s²')
-            date: Fecha/timestamp de la onda
-            save_file: Ruta para guardar el gráfico (opcional)
+            machine: Machine ID
+            point: Measurement point
+            procMode: Processing mode
+            unit: Unit of measurement (e.g.: 'mm/s', 'g', 'm/s²')
+            date: Date/timestamp of the wave
+            save_file: Path to save the plot (optional)
         """
         self._setup_matplotlib_interactive()
-        print(f"Obteniendo onda para {machine}:{point}:{procMode}...")
+        print(f"Getting wave for {machine}:{point}:{procMode}...")
         wave_data = self.get_wave(machine, point, procMode, date)
         if not wave_data:
-            print("No se pudo obtener la onda.")
+            print("Could not get wave.")
             return
 
-        # Extraer datos de la respuesta
+        # Extract data from response
         encoded_data = wave_data.get("data", "")
         factor = wave_data.get("factor", 1.0)
-        sample_rate = wave_data.get("sample_rate", 1)  # En Hz
+        sample_rate = wave_data.get("sample_rate", 1)  # In Hz
 
         if not encoded_data:
-            print("No hay datos de onda para decodificar.")
+            print("No wave data to decode.")
             return
 
-        print(f"Decodificando datos (factor: {factor}, fs: {sample_rate} Hz)...")
+        print(f"Decoding data (factor: {factor}, fs: {sample_rate} Hz)...")
 
-        # Decodificar los datos comprimidos
+        # Decode compressed data
         samples = self.decode_data(encoded_data, factor)
         if not samples:
-            print("No se pudieron decodificar los datos de la onda.")
+            print("Could not decode wave data.")
             return
 
-        # Crear array de tiempo
+        # Create time array
         duration = len(samples) / sample_rate
         times = [i / sample_rate for i in range(len(samples))]
 
         unit = self.getUnits(machine, point, procMode)
-        print("Generando gráfico...")
+        print("Generating plot...")
 
-        # Crear el gráfico
+        # Create plot
         plt.figure(figsize=(14, 8))
         plt.plot(times, samples, "b-", linewidth=0.8)
         plt.title(
-            f"Señal de Vibración - {machine}:{point}:{procMode}",
+            f"Vibration Signal - {machine}:{point}:{procMode}",
             fontsize=14,
             fontweight="bold",
         )
-        plt.xlabel("Tiempo (s)", fontsize=12)
-        plt.ylabel(f"Amplitud ({unit})", fontsize=12)
+        plt.xlabel("Time (s)", fontsize=12)
+        plt.ylabel(f"Amplitude ({unit})", fontsize=12)
         plt.grid(True, alpha=0.3)
 
-        # Añadir información en el gráfico
+        # Add information to the plot
         info_text = (
-            f"Muestras: {len(samples)}\nFs: {sample_rate} Hz\nDuración: {duration:.2f}s"
+            f"Samples: {len(samples)}\nFs: {sample_rate} Hz\nDuration: {duration:.2f}s"
         )
         plt.text(
             0.02,
@@ -567,22 +566,22 @@ class T8ApiClient:
             bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
         )
 
-        # Guardar y mostrar el gráfico
+        # Save and display plot
         self._save_and_show_plot(machine, point, procMode, "wave", save_file)
 
-        print("✓ Gráfico generado exitosamente")
-        print(f"  - {len(samples)} muestras a {sample_rate} Hz")
-        print(f"  - Duración: {duration:.2f} segundos")
-        print(f"  - Rango: {min(samples):.2f} a {max(samples):.2f}")
+        print("✓ Plot generated successfully")
+        print(f"  - {len(samples)} samples at {sample_rate} Hz")
+        print(f"  - Duration: {duration:.2f} seconds")
+        print(f"  - Range: {min(samples):.2f} to {max(samples):.2f}")
 
     def getUnits(self, machine: str, point: str, procMode: str) -> str:
         """
-        Lo primero que tengo que hacer es entrar a la configuración, luego
-        tengo que ir a la máquina, después al punto y ahí vamos al punto con
-        el nombre que estoy buscando y entro en input, luego en sensor, saco
+        First I need to enter the configuration, then
+        I need to go to the machine, then to the point and there we go to the point with
+        the name I'm looking for and enter input, then sensor, get
         unit_id.
-        Una vez tengo unit_id, voy a  ir en la configuración a sacar units y
-        busco la que tenga ese id que sacamos antes.
+        Once we have unit_id, I will go to the configuration to get units and
+        look for the one with that id we got before.
         """
         try:
             url = BASE_URL + "confs/0"
@@ -619,72 +618,71 @@ class T8ApiClient:
         date: str | None = "0",
         save_file: str | None = None,
     ) -> None:
-        """Genera un gráfico del espectro usando matplotlib.
+        """Generates a spectrum plot using matplotlib.
 
         Args:
-            machine: ID de la máquina
-            point: Punto de medida
-            procMode: Modo de procesamiento
-            date: Fecha/timestamp del espectro
-            save_file: Ruta para guardar el gráfico (opcional)
+            machine: Machine ID
+            point: Measurement point
+            procMode: Processing mode
+            date: Date/timestamp of the spectrum
+            save_file: Path to save the plot (optional)
         """
         self._setup_matplotlib_interactive()
-        print(f"Obteniendo espectro para {machine}:{point}:{procMode}...")
+        print(f"Getting spectrum for {machine}:{point}:{procMode}...")
         spec_data = self.get_spectrum(machine, point, procMode, date)
         if not spec_data:
-            print("No se pudo obtener el espectro.")
+            print("Could not get spectrum.")
             return
 
-        # Extraer datos de la respuesta del espectro
+        # Extract data from spectrum response
         encoded_data = spec_data.get("data", "")
         factor = spec_data.get("factor", 1.0)
         max_freq = spec_data.get("max_freq", 250)  # Hz
         min_freq = spec_data.get("min_freq", 0.625)  # Hz
 
         if not encoded_data:
-            print("No hay datos de espectro para decodificar.")
+            print("No spectrum data to decode.")
             return
 
         print(
-            f"Decodificando datos (factor: {factor}, freq: {min_freq}-{max_freq} Hz)"
-            + "..."
+            f"Decoding data (factor: {factor}, freq: {min_freq}-{max_freq} Hz)" + "..."
         )
 
-        # Decodificar los datos comprimidos (usar el mismo método que las ondas)
+        # Decode compressed data (use the same method as waves)
         samples = self.decode_data(encoded_data, factor)
         if not samples:
-            print("No se pudieron decodificar los datos del espectro.")
+            print("Could not decode spectrum data.")
             return
 
-        # Crear array de frecuencias
+        # Create frequency array
         num_samples = len(samples)
         frequencies = [
             min_freq + i * (max_freq - min_freq) / (num_samples - 1)
             for i in range(num_samples)
         ]
 
-        # Obtener unidades automáticamente
+        # Get units automatically
         unit = self.getUnits(machine, point, procMode)
         if not unit:
             unit = "Unknown Unit"
 
-        print("Generando gráfico...")
+        print("Generating plot...")
 
-        # Crear el gráfico del espectro
+        # Create spectrum plot
         plt.figure(figsize=(14, 8))
         plt.plot(frequencies, samples, "b-", linewidth=0.8)
         plt.title(
-            f"Espectro - {machine}:{point}:{procMode}", fontsize=14, fontweight="bold"
+            f"Spectrum - {machine}:{point}:{procMode}", fontsize=14, fontweight="bold"
         )
-        plt.xlabel("Frecuencia (Hz)", fontsize=12)
-        plt.ylabel(f"Amplitud ({unit})", fontsize=12)
+        plt.xlabel("Frequency (Hz)", fontsize=12)
+        plt.ylabel(f"Amplitude ({unit})", fontsize=12)
         plt.grid(True, alpha=0.3)
 
-        # Añadir información en el gráfico
+        # Add information to the plot
         info_text = (
-            f"Muestras: {num_samples}\n"
-            f"Rango freq: {min_freq}-{max_freq} Hz\n"
-            f"Resolución: {(max_freq - min_freq) / (num_samples - 1):.3f} Hz"
+            f"Samples: {num_samples}\n"
+            f"Freq range: {min_freq}-{max_freq} Hz\n"
+            f"Resolution: {(max_freq - min_freq) / (num_samples - 1):.3f} Hz"
         )
         plt.text(
             0.02,
@@ -695,36 +693,36 @@ class T8ApiClient:
             bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
         )
 
-        # Guardar y mostrar el gráfico
+        # Save and display plot
         self._save_and_show_plot(machine, point, procMode, "spectrum", save_file)
 
-        print("✓ Gráfico generado exitosamente")
-        print(f"  - {num_samples} muestras")
-        print(f"  - Frecuencia: {min_freq:.3f} - {max_freq:.1f} Hz")
-        print(f"  - Rango: {min(samples):.6f} a {max(samples):.6f}")
+        print("✓ Plot generated successfully")
+        print(f"  - {num_samples} samples")
+        print(f"  - Frequency: {min_freq:.3f} - {max_freq:.1f} Hz")
+        print(f"  - Range: {min(samples):.6f} to {max(samples):.6f}")
 
     def compute_spectrum_from_wave_data(
         self, wave_filepath: str
     ) -> tuple[np.ndarray, np.ndarray, dict]:
         """
-        Calcula un espectro a partir de un archivo de onda JSON.
+        Calculates a spectrum from a wave JSON file.
 
         Args:
-            wave_filepath: Ruta al archivo JSON de la onda
-            fmin: Frecuencia mínima opcional (si no se proporciona, usa API)
-            fmax: Frecuencia máxima opcional (si no se proporciona, usa API)
+            wave_filepath: Path to the wave JSON file
+            fmin: Optional minimum frequency (if not provided, uses API)
+            fmax: Optional maximum frequency (if not provided, uses API)
 
         Returns:
-            Tuple con (frecuencias, amplitudes, metadata)
+            Tuple with (frequencies, amplitudes, metadata)
         """
         with open(wave_filepath) as f:
             data = json.load(f)
 
-        # Extraer datos de la onda
+        # Extract wave data
         waveform = data.get("data")
         waveform = self.decode_data(waveform, data.get("factor", 1.0))
 
-        # Extraer información del path usando la función auxiliar
+        # Extract information from path using helper function
         path = data.get("path", "Unknown:Unknown:Unknown")
         machine_name, point, proc_mode = self._parse_machine_path(path)
 
@@ -736,14 +734,14 @@ class T8ApiClient:
             fmin = mode_config.get("min_freq", 0)
             fmax = mode_config.get("max_freq", sample_rate / 2)
 
-        # Valores por defecto si no se pudieron obtener de la API
+        # Default values if they couldn't be obtained from the API
         sample_rate = data.get("sample_rate", 1)
         if fmin is None:
             fmin = 0
         if fmax is None:
             fmax = sample_rate / 2
 
-        # Calcular espectro
+        # Calculate spectrum
         frequencies, amplitudes = T8ApiClient.compute_spectrum(
             np.array(waveform), sample_rate, fmin, fmax
         )
@@ -765,12 +763,12 @@ class T8ApiClient:
 
     def compute_spectrum_with_json(self, wave_filepath: str) -> None:
         """
-        Calcula y muestra un espectro a partir de un archivo de onda JSON.
+        Calculates and displays a spectrum from a wave JSON file.
 
         Args:
-            wave_filepath: Ruta al archivo JSON de la onda
+            wave_filepath: Path to the wave JSON file
         """
-        # Usar la función refactorizada para obtener datos del espectro
+        # Use refactored function to get spectrum data
         frequencies, amplitudes, metadata = self.compute_spectrum_from_wave_data(
             wave_filepath
         )
@@ -782,33 +780,33 @@ class T8ApiClient:
         max_freq = metadata["max_freq"]
         sample_rate = metadata["sample_rate"]
 
-        print(f"Calculando espectro para {machine_name}:{point}:{proc_mode}...")
+        print(f"Calculating spectrum for {machine_name}:{point}:{proc_mode}...")
         print(f"  - Sample rate: {sample_rate} Hz")
         print(f"  - Fmin: {min_freq} Hz")
         print(f"  - Fmax: {max_freq} Hz")
 
-        # Obtener unidades automáticamente
+        # Get units automatically
         unit = self.getUnits(machine_name, point, proc_mode)
         if not unit:
             unit = "Unknown Unit"
 
-        # Configurar matplotlib y crear gráfico
+        # Configure matplotlib and create plot
         self._setup_matplotlib_interactive()
         plt.figure(figsize=(14, 8))
         plt.plot(frequencies, amplitudes, "b-", linewidth=0.8)
         plt.title(
-            f"Espectro Computado - {machine_name}:{point}:{proc_mode}",
+            f"Computed Spectrum - {machine_name}:{point}:{proc_mode}",
             fontsize=14,
             fontweight="bold",
         )
-        plt.xlabel("Frecuencia (Hz)", fontsize=12)
-        plt.ylabel(f"Amplitud ({unit})", fontsize=12)
+        plt.xlabel("Frequency (Hz)", fontsize=12)
+        plt.ylabel(f"Amplitude ({unit})", fontsize=12)
         plt.grid(True, alpha=0.3)
 
-        # Añadir información en el gráfico
+        # Add information to the plot
         info_text = (
-            f"Muestras: {len(amplitudes)}\n"
-            f"Rango freq: {min_freq}-{max_freq} Hz\n"
+            f"Samples: {len(amplitudes)}\n"
+            f"Freq range: {min_freq}-{max_freq} Hz\n"
             f"Sample rate: {sample_rate} Hz"
         )
         plt.text(
@@ -820,17 +818,17 @@ class T8ApiClient:
             bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
         )
 
-        # Guardar y mostrar el gráfico
+        # Save and display plot
         self._save_and_show_plot(
             machine_name, point, proc_mode, "spectrum", suffix="_computed"
         )
 
-        print("✓ Espectro computado exitosamente")
-        print(f"  - {len(amplitudes)} puntos freq")
-        print(f"  - Frecuencia: {min_freq:.1f} - {max_freq:.1f} Hz")
+        print("✓ Spectrum computed successfully")
+        print(f"  - {len(amplitudes)} freq points")
+        print(f"  - Frequency: {min_freq:.1f} - {max_freq:.1f} Hz")
         min_val = min(amplitudes)
         max_val = max(amplitudes)
-        print(f"  - Rango: {min_val:.6f} a {max_val:.6f}")
+        print(f"  - Range: {min_val:.6f} to {max_val:.6f}")
 
     @staticmethod
     def compute_spectrum(
@@ -853,33 +851,33 @@ class T8ApiClient:
             - filtered_spectrum: The magnitude of the frequency spectrum within
                 the specified range, with an RMS AC detector.
         """
-        # Convertir lista a numpy array si es necesario
+        # Convert list to numpy array if necessary
         if not isinstance(waveform, np.ndarray):
             waveform = np.array(waveform)
 
-        # Remover componente DC (valor medio)
+        # Remove DC component (mean value)
         waveform = waveform - np.mean(waveform)
 
-        # Aplicar ventana Hanning para reducir efectos de borde
+        # Apply Hanning window to reduce edge effects
         # window = np.hanning(len(waveform))
         # waveform_windowed = waveform * window
         waveform_windowed = waveform.copy()
 
-        # Calcular FFT
+        # Calculate FFT
         spectrum = np.fft.fft(waveform_windowed)
         magnitude = np.abs(spectrum) / len(spectrum)
         freqs = np.fft.fftfreq(len(waveform), 1 / sample_rate)
 
-        # Solo usar frecuencias positivas (primera mitad del espectro)
+        # Only use positive frequencies (first half of spectrum)
         n = len(waveform) // 2
         freqs_positive = freqs[:n]
-        magnitude_positive = magnitude[:n] * 2  # Factor 2 para energía
+        magnitude_positive = magnitude[:n] * 2  # Factor 2 for energy
 
-        # Excluir la frecuencia 0 Hz (DC) del filtrado si fmin es 0
+        # Exclude 0 Hz frequency (DC) from filtering if fmin is 0
         if fmin == 0:
             fmin = freqs_positive[1] if len(freqs_positive) > 1 else 0
 
-        # Filtrar por rango de frecuencias
+        # Filter by frequency range
         mask = (freqs_positive >= fmin) & (freqs_positive <= fmax)
         filtered_freqs = freqs_positive[mask]
         filtered_spectrum = magnitude_positive[mask]
