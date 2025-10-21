@@ -3,7 +3,7 @@ import os
 import click  # type: ignore
 from dotenv import load_dotenv  # type: ignore
 
-from t8_client import T8ApiClient
+from t8_client.t8_client import T8ApiClient
 
 # Cargar variables de entorno
 load_dotenv()

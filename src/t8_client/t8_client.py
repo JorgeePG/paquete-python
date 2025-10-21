@@ -243,6 +243,22 @@ class T8ApiClient:
                 else:
                     print(f"{i:2d}. URL: {wave_url}")
 
+    def _get_timestamp_from_item(self, item: dict) -> int:
+        """
+        Extrae el timestamp de un item (wave o spectrum) desde su URL.
+
+        Args:
+            item: Diccionario con la información del item
+
+        Returns:
+            int: Timestamp extraído del URL, o -1 si no se puede extraer
+        """
+        item_url = item.get("_links", {}).get("self", "")
+        try:
+            return int(item_url.split("/")[-1]) if item_url else -1
+        except ValueError:
+            return -1
+
     def list_waves(self, machine: str, point: str, procMode: str) -> bool:
         url = BASE_URL + "waves/" + machine + "/" + point + "/" + procMode
         response = self.session.get(url)
@@ -250,7 +266,9 @@ class T8ApiClient:
         if not data:
             return False
         for wave in data.get("_items", []):
-            print(self.get_timestamp_and_formatted_wave_date(wave))
+            # Filtrar los que tienen timestamp = 0
+            if self._get_timestamp_from_item(wave) != 0:
+                print(self.get_timestamp_and_formatted_wave_date(wave))
         return True
 
     def list_spectra(self, machine: str, point: str, procMode: str) -> bool:
@@ -259,8 +277,10 @@ class T8ApiClient:
         data = self.check_ok_response(response)
         if not data:
             return False
-        for wave in data.get("_items", []):
-            print(self.get_timestamp_and_formatted_wave_date(wave))
+        for spectrum in data.get("_items", []):
+            # Filtrar los que tienen timestamp = 0
+            if self._get_timestamp_from_item(spectrum) != 0:
+                print(self.get_timestamp_and_formatted_wave_date(spectrum))
         return True
 
     def get_wave(
@@ -487,6 +507,7 @@ class T8ApiClient:
             machine: ID de la máquina
             point: Punto de medida
             procMode: Modo de procesamiento
+            unit: Unidad de medida (ej: 'mm/s', 'g', 'm/s²')
             date: Fecha/timestamp de la onda
             save_file: Ruta para guardar el gráfico (opcional)
         """
@@ -518,6 +539,7 @@ class T8ApiClient:
         duration = len(samples) / sample_rate
         times = [i / sample_rate for i in range(len(samples))]
 
+        unit = self.getUnits(machine, point, procMode)
         print("Generando gráfico...")
 
         # Crear el gráfico
@@ -529,7 +551,7 @@ class T8ApiClient:
             fontweight="bold",
         )
         plt.xlabel("Tiempo (s)", fontsize=12)
-        plt.ylabel("Amplitud", fontsize=12)
+        plt.ylabel(f"Amplitud ({unit})", fontsize=12)
         plt.grid(True, alpha=0.3)
 
         # Añadir información en el gráfico
@@ -552,6 +574,42 @@ class T8ApiClient:
         print(f"  - {len(samples)} muestras a {sample_rate} Hz")
         print(f"  - Duración: {duration:.2f} segundos")
         print(f"  - Rango: {min(samples):.2f} a {max(samples):.2f}")
+
+    def getUnits(self, machine: str, point: str, procMode: str) -> str:
+        """
+        Lo primero que tengo que hacer es entrar a la configuración, luego
+        tengo que ir a la máquina, después al punto y ahí vamos al punto con
+        el nombre que estoy buscando y entro en input, luego en sensor, saco
+        unit_id.
+        Una vez tengo unit_id, voy a  ir en la configuración a sacar units y
+        busco la que tenga ese id que sacamos antes.
+        """
+        try:
+            url = BASE_URL + "confs/0"
+            response = self.session.get(url)
+            conf_data = self.check_ok_response(response)
+
+            if not conf_data:
+                return None
+
+            unit_id = None
+            machines = conf_data.get("machines", [])
+            for m in machines:
+                if m.get("name") == machine:
+                    points = m.get("points", [])
+                    for p in points:
+                        if p.get("name") == point:
+                            unit_id = (
+                                p.get("input", {}).get("sensor", {}).get("unit_id")
+                            )
+            if unit_id is not None:
+                units = conf_data.get("units", [])
+                for unit in units:
+                    if unit.get("id") == unit_id:
+                        return unit.get("label", "Unknown Unit")
+            return None
+        except Exception:
+            return None
 
     def plot_spectrum(
         self,
@@ -605,6 +663,11 @@ class T8ApiClient:
             for i in range(num_samples)
         ]
 
+        # Obtener unidades automáticamente
+        unit = self.getUnits(machine, point, procMode)
+        if not unit:
+            unit = "Unknown Unit"
+
         print("Generando gráfico...")
 
         # Crear el gráfico del espectro
@@ -614,7 +677,7 @@ class T8ApiClient:
             f"Espectro - {machine}:{point}:{procMode}", fontsize=14, fontweight="bold"
         )
         plt.xlabel("Frecuencia (Hz)", fontsize=12)
-        plt.ylabel("Amplitud", fontsize=12)
+        plt.ylabel(f"Amplitud ({unit})", fontsize=12)
         plt.grid(True, alpha=0.3)
 
         # Añadir información en el gráfico
@@ -724,6 +787,11 @@ class T8ApiClient:
         print(f"  - Fmin: {min_freq} Hz")
         print(f"  - Fmax: {max_freq} Hz")
 
+        # Obtener unidades automáticamente
+        unit = self.getUnits(machine_name, point, proc_mode)
+        if not unit:
+            unit = "Unknown Unit"
+
         # Configurar matplotlib y crear gráfico
         self._setup_matplotlib_interactive()
         plt.figure(figsize=(14, 8))
@@ -734,7 +802,7 @@ class T8ApiClient:
             fontweight="bold",
         )
         plt.xlabel("Frecuencia (Hz)", fontsize=12)
-        plt.ylabel("Amplitud", fontsize=12)
+        plt.ylabel(f"Amplitud ({unit})", fontsize=12)
         plt.grid(True, alpha=0.3)
 
         # Añadir información en el gráfico
