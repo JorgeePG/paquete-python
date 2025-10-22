@@ -130,7 +130,7 @@ def compare_spectra(
         api_freqs, api_amplitudes, api_metadata = load_api_spectrum(spectrum_file)
         print(f"✓ API spectrum loaded: {api_metadata['num_samples']} points")
         print(
-            f"  Range: {api_metadata['min_freq']:.1f} - {api_metadata['max_freq']:.1f} Hz"
+            f"  Range: {api_metadata['min_freq']:.1f} - {api_metadata['max_freq']:.1f} Hz"  # noqa: E501
         )  # noqa: E501
     except Exception as e:
         print(f"❌ Error loading API spectrum: {e}")
@@ -144,8 +144,8 @@ def compare_spectra(
         )
         print(f"✓ Spectrum calculated: {calc_metadata['num_samples']} points")
         print(
-            f"  Range: {calc_metadata['min_freq']:.1f} - {calc_metadata['max_freq']:.1f} Hz"
-        )  # noqa: E501
+            f"  Range: {calc_metadata['min_freq']:.1f} - {calc_metadata['max_freq']:.1f} Hz"  # noqa: E501
+        )
     except Exception as e:
         print(f"❌ Error calculating spectrum: {e}")
         return
@@ -230,10 +230,12 @@ def compare_spectra(
     # Comparison statistics
     print("\n📈 Comparison statistics:")
     print(
-        f"  API    - Points: {len(api_amplitudes):,}, Max: {np.max(api_amplitudes):.6f}, RMS: {np.sqrt(np.mean(api_amplitudes**2)):.6f}"
+        f"  API  - Points: {len(api_amplitudes):,}, Max: {np.max(api_amplitudes):.6f},"
+        f"         RMS: {np.sqrt(np.mean(api_amplitudes**2)):.6f}"
     )  # noqa: E501
     print(
-        f"  Calc   - Points: {len(calc_amplitudes):,}, Max: {np.max(calc_amplitudes):.6f}, RMS: {np.sqrt(np.mean(calc_amplitudes**2)):.6f}"
+        f" Calc - Points: {len(calc_amplitudes):,}, Max: {np.max(calc_amplitudes):.6f},"
+        f"         RMS: {np.sqrt(np.mean(calc_amplitudes**2)):.6f}"
     )  # noqa: E501
 
     # Try to calculate correlation if ranges are compatible
