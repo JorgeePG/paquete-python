@@ -826,7 +826,7 @@ class TestCompareSpectra:
         result = runner.invoke(compare_spectra, [str(spectrum_file), str(wave_file)])
 
         assert result.exit_code == 0
-        assert "Error executing script" in result.output
+        assert "Error executing comparison script" in result.output
 
 
 class TestCLIGroup:

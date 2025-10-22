@@ -80,7 +80,7 @@ class TestT8ApiClient:
         with pytest.raises(ValueError) as excinfo:
             client._parse_date_to_timestamp("invalid-date")
 
-        assert "Error de formato" in str(excinfo.value)
+        assert "Format error" in str(excinfo.value)
 
     def test_check_ok_response_success(self) -> None:
         """Test check_ok_response with successful response."""
