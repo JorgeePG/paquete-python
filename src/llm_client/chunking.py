@@ -103,6 +103,7 @@ class ConfigChunker:
                                 "type": point.get("type"),
                                 "unit_id": point.get("unit_id"),
                                 "input_number": point.get("input", {}).get("number"),
+                                "sensor": point.get("input", {}).get("sensor", {}),  # AÑADIDO: Info completa del sensor
                                 "num_proc_modes": len(point.get("proc_modes", [])),
                                 "proc_mode_tags": [
                                     pm.get("tag") for pm in point.get("proc_modes", [])
@@ -138,19 +139,28 @@ class ConfigChunker:
                     proc_modes = point.get("proc_modes", [])
 
                     for mode in proc_modes:
-                        simplified = {
+                        # Incluir TODOS los campos relevantes según DocComprimida.md
+                        mode_complete = {
                             "id": mode.get("id"),
                             "tag": mode.get("tag"),
                             "name": mode.get("name"),
                             "type": mode.get("type"),
+                            "sample_rate": mode.get("sample_rate"),
+                            "samples": mode.get("samples"),  # AÑADIDO
                             "max_freq": mode.get("max_freq"),
                             "min_freq": mode.get("min_freq"),
-                            "sample_rate": mode.get("sample_rate"),
                             "bins": mode.get("bins"),
+                            "averages": mode.get("averages"),  # AÑADIDO
+                            "overlap": mode.get("overlap"),  # AÑADIDO
+                            "window": mode.get("window"),  # AÑADIDO
+                            "integrate_sp": mode.get("integrate_sp"),  # AÑADIDO
+                            "save_sp": mode.get("save_sp"),  # AÑADIDO
+                            "save_wf": mode.get("save_wf"),  # AÑADIDO
+                            "selectors": mode.get("selectors", []),  # AÑADIDO
                             "num_params": len(mode.get("params", [])),
                             "point": point_tag,  # Identificar a qué punto pertenece
                         }
-                        all_modes.append(simplified)
+                        all_modes.append(mode_complete)
 
                 if all_modes:
                     chunks.append(
@@ -166,48 +176,74 @@ class ConfigChunker:
                         )
                     )
 
-        # Fragmento 4: Parámetros calculados (CONSOLIDADO por punto, no por modo)
+        # Fragmento 4: Parámetros calculados (OPTIMIZADO - por punto, con batching)
         if "machines" in config_data:
             for machine in config_data["machines"]:
                 machine_tag = machine.get("tag", "unknown")
+                
+                # Consolidar todos los puntos de esta máquina
+                all_points_params = []
+                
                 for point in machine.get("points", []):
                     point_tag = point.get("tag", "unknown")
                     
-                    # Consolidar TODOS los parámetros de este punto
-                    all_params = []
+                    # Capturar información del sensor para determinar unidades correctas
+                    sensor_info = point.get("input", {}).get("sensor", {})
+                    point_unit_id = point.get("unit_id")
+                    
+                    # Consolidar parámetros de este punto
+                    point_params = []
                     for mode in point.get("proc_modes", []):
                         mode_tag = mode.get("tag", "unknown")
+                        mode_integrate_sp = mode.get("integrate_sp", 0)
                         params = mode.get("params", [])
                         
                         for param in params:
-                            detail = {
+                            # Incluir campos esenciales de forma compacta
+                            param_compact = {
                                 "id": param.get("id"),
                                 "tag": param.get("tag"),
                                 "name": param.get("name"),
+                                "path": param.get("path"),
                                 "type": param.get("type"),
+                                "integrate": param.get("integrate"),
                                 "detector": param.get("detector"),
-                                "limit_max": param.get("limit_max"),
-                                "limit_min": param.get("limit_min"),
-                                "has_alarms": len(param.get("alarms", [])) > 0,
-                                "num_alarms": len(param.get("alarms", [])),
+                                "spectral_bands": param.get("spectral_bands", []),
+                                "alarms": param.get("alarms", []),
+                                "unit_id": param.get("unit_id"),
+                                "custom_unit_id": param.get("custom_unit_id"),
                                 "proc_mode": mode_tag,
+                                "proc_mode_integrate_sp": mode_integrate_sp,
                             }
-                            all_params.append(detail)
+                            point_params.append(param_compact)
                     
-                    # Solo crear fragmento si hay parámetros
-                    if all_params:
+                    if point_params:
+                        all_points_params.append({
+                            "point": point_tag,
+                            "point_unit_id": point_unit_id,
+                            "sensor": sensor_info,
+                            "params": point_params,
+                        })
+                
+                # Dividir en grupos de máximo 3 puntos para no sobrecargar
+                if all_points_params:
+                    batch_size = 3
+                    for batch_idx in range(0, len(all_points_params), batch_size):
+                        batch = all_points_params[batch_idx:batch_idx + batch_size]
+                        point_tags = [p["point"] for p in batch]
+                        
                         chunks.append(
                             ConfigChunk(
-                                chunk_id=f"{config_uid}:params_{machine_tag}_{point_tag}",
+                                chunk_id=f"{config_uid}:params_{machine_tag}_batch{batch_idx // batch_size}",
                                 chunk_type="calculated_params",
                                 content={
                                     "machine": machine_tag,
-                                    "point": point_tag,
-                                    "params": all_params,
+                                    "points_data": batch,
                                 },
                                 description=(
-                                    f"Parámetros calculados en "
-                                    f"{machine_tag}:{point_tag}"
+                                    f"Parámetros de {machine_tag}: "
+                                    f"{', '.join(point_tags[:2])}"
+                                    f"{' y más' if len(point_tags) > 2 else ''}"
                                 ),
                                 config_uid=config_uid,
                             )
@@ -312,13 +348,23 @@ class ConfigChunker:
                 )
 
         elif chunk.chunk_type == "calculated_params":
-            params = chunk.content.get("params", [])
-            summary += f"Total de parámetros: {len(params)}\n"
-            for p in params[:5]:  # Solo primeros 5
-                summary += (
-                    f"  - {p['tag']}: {p.get('name', 'N/A')} "
-                    f"({p.get('num_alarms', 0)} alarmas)\n"
-                )
+            # Resumen compacto de parámetros por puntos
+            points_data = chunk.content.get("points_data", [])
+            summary += f"Puntos: {len(points_data)}\n"
+            
+            for point_data in points_data:
+                point = point_data.get("point", "N/A")
+                params = point_data.get("params", [])
+                sensor = point_data.get("sensor", {})
+                sensor_unit = sensor.get("unit_id", "N/A")
+                
+                summary += f"  - {point} (sensor unit={sensor_unit}): {len(params)} parámetros"
+                
+                # Contar alarmas totales
+                total_alarms = sum(len(p.get('alarms', [])) for p in params)
+                if total_alarms > 0:
+                    summary += f", {total_alarms} alarmas"
+                summary += "\n"
 
         elif chunk.chunk_type == "operational_states":
             states = chunk.content.get("states", [])

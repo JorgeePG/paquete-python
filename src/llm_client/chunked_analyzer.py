@@ -173,7 +173,7 @@ class ChunkedAnalyzer:
         response = self.llm_client._generate_completion(
             prompt=prompt,
             temperature=temperature,
-            max_tokens=min(2048, model_config.max_tokens),
+            max_tokens=min(1500, model_config.max_tokens),  # Reducido de 2048 a 1500
             stream=False,
             model=model_config.name,  # Modelo dinámico
         )
@@ -201,140 +201,128 @@ class ChunkedAnalyzer:
         # Prompts base con contexto API específico
         prompts = {
             "machines_summary": f"""
-Eres un experto en sistemas TWave T8. Analiza el siguiente resumen de máquinas:
+Analiza este resumen de máquinas T8:
 
 {api_context}
 
-**DATOS A ANALIZAR:**
+**DATOS:**
 ```json
 {chunk_json}
 ```
 
-Proporciona una descripción concisa de:
-- Número de máquinas configuradas
-- Nombres y tags de las máquinas
-- Cantidad de puntos de medición por máquina
-- Estados y estrategias configuradas
-
-Sé breve y directo.""",
+Lista brevemente: máquinas, puntos por máquina, estados y estrategias.
+Máximo 300 palabras.""",
             "measurement_points": f"""
-Eres un experto en sistemas TWave T8. Analiza los siguientes puntos de medición:
+Analiza puntos de medición T8:
 
 {api_context}
 
-**DATOS A ANALIZAR:**
+**DATOS:**
 ```json
 {chunk_json}
 ```
 
-Describe brevemente:
-- Tipos de sensores y su configuración (según el campo `type` y `mode`)
-- Ubicaciones de medición principales (según `path` y `component_id`)
-- Configuración de entrada física (si aplica)
-
-Sé conciso y técnico.""",
+Resume: tipos de sensores (type/mode), ubicaciones (path), configuración física.
+Formato tabla compacta. Máximo 400 palabras.""",
             "processing_modes": f"""
-Eres un experto en sistemas TWave T8. Analiza los siguientes modos de procesamiento:
+Analiza modos de procesamiento T8:
 
 {api_context}
 
-**DATOS A ANALIZAR:**
+**DATOS:**
 ```json
 {chunk_json}
 ```
 
-Explica brevemente (usando el contexto API):
-- Configuraciones FFT: sample_rate, max_freq, bins, averages
-- Tipo de procesamiento (type) y su significado
-- Niveles de integración aplicados (integrate_sp)
-- Configuración de guardado (save_sp, save_wf)
-
-Sé técnico y preciso.""",
+Indica: FFT config (sample_rate, max_freq, bins), averages, overlap, window, 
+integrate_sp (afecta unidades), save_sp/save_wf.
+Formato tabla. Máximo 500 palabras.""",
             "calculated_params": f"""
-Eres un experto en sistemas TWave T8. Analiza los siguientes parámetros calculados:
+Eres experto en TWave T8. Analiza estos parámetros calculados:
 
 {api_context}
 
-**DATOS A ANALIZAR:**
+**DATOS:**
 ```json
 {chunk_json}
 ```
 
-Describe (interpretando según el contexto API):
-- Tipo de cálculo (type) y su significado exacto
-- Configuración de alarmas por estado (si existen)
-- Bandas espectrales (spectral_bands) si aplican
-- Niveles de integración y detección aplicados
+Para cada punto, indica de forma COMPACTA:
+- Parámetros principales (tag, type, integrate)
+- Unidades resultantes (considerando sensor.unit_id e integrate)
+- Bandas espectrales si aplica (type 6/9)
+- Alarmas configuradas (solo si existen, indicar state_id y valores)
 
-Sé preciso y técnico.""",
+**REGLAS UNIDADES CRÍTICAS:**
+- Si sensor.unit_id=14 (µm) y integrate=0 → resultado en µm
+- Si sensor.unit_id=14 (µm) y integrate=1 → resultado en mm/s
+- Si sensor.unit_id=14 (µm) y integrate=2 → resultado en g
+
+Formato: Lista concisa, evita repetir estructura JSON. Máximo 500 palabras.""",
             "operational_states": f"""
-Eres un experto en sistemas TWave T8. Analiza los siguientes estados operativos:
+Analiza estados operativos T8:
 
 {api_context}
 
-**DATOS A ANALIZAR:**
+**DATOS:**
 ```json
 {chunk_json}
 ```
 
-Explica (usando el contexto API):
-- Nombres y condiciones de cada estado
-- Lógica de las condiciones (expresiones con speed, params)
-- Propósito de cada estado en el monitoreo
-
-Sé conciso.""",
+Lista: nombres, condiciones (expresiones con speed/params), propósito.
+Máximo 300 palabras.""",
             "storage_strategies": f"""
-Eres un experto en sistemas TWave T8. Analiza las siguientes estrategias de
-almacenamiento:
+Analiza estrategias de almacenamiento T8:
 
 {api_context}
 
-**DATOS A ANALIZAR:**
+**DATOS:**
 ```json
 {chunk_json}
 ```
 
-Describe (interpretando el campo `type` según contexto API):
-- Tipo de disparador de cada estrategia
-- Configuración específica (cron_line, mon_period, state transitions, alarm levels)
-- Cuándo y por qué se almacenan datos
+Por cada estrategia indica:
+- Tipo (type) y qué lo dispara:
+  * type 0: Tiempo/Cron (cron_line)
+  * type 1: Ciclos de monitorización (mon_period)
+  * type 2: Cambio de estado (de state1_id a state2_id)
+  * type 3: Nivel de alarma de parámetros (alarm level)
+  * type 5: Manual
+- Condición adicional (condition) si existe
+- **CRÍTICO:** Menciona qué estados o parámetros están involucrados
 
-Sé técnico.""",
+Formato tabla. Máximo 400 palabras.""",
             "system_properties": f"""
-Eres un experto en sistemas TWave T8. Analiza las siguientes propiedades del sistema:
+Analiza propiedades del sistema T8:
 
 {api_context}
 
-**DATOS A ANALIZAR:**
+**DATOS:**
 ```json
 {chunk_json}
 ```
 
-Resume (usando el contexto API):
-- Propiedades físicas (properties) y sus IDs
-- Unidades de medida (units) con factores de conversión
-- Relaciones entre properties y units (property_id)
-
-Sé directo y técnico.""",
+Resume: propiedades físicas (properties), unidades (units) con factores de conversión,
+relaciones property_id.
+Formato tabla. Máximo 300 palabras.""",
         }
 
         # Fallback con contexto genérico
         return prompts.get(
             chunk.chunk_type,
             f"""
-Eres un experto en sistemas TWave T8.
+Analiza este fragmento de configuración T8:
 
 {api_context}
 
-**FRAGMENTO A ANALIZAR:**
-Tipo: {chunk.chunk_type}
-Descripción: {chunk.description}
+**Fragmento:** {chunk.chunk_type}
+**Descripción:** {chunk.description}
 
 ```json
 {chunk_json}
 ```
 
-Proporciona un análisis breve y conciso basándote en el contexto API proporcionado.""",
+Análisis breve basado en contexto API. Máximo 300 palabras.""",
         )
 
     def _aggregate_analyses(
@@ -346,6 +334,7 @@ Proporciona un análisis breve y conciso basándote en el contexto API proporcio
     ) -> str | Generator[str]:
         """
         Agrega todos los análisis parciales en uno final y coherente.
+        Optimizado para reducir tokens usando resúmenes estructurados.
 
         Args:
             partial_analyses: Lista de análisis parciales
@@ -356,59 +345,87 @@ Proporciona un análisis breve y conciso basándote en el contexto API proporcio
         Returns:
             Análisis final agregado
         """
-        # Construir contexto con todos los análisis parciales
-        context = "**ANÁLISIS PARCIALES DE LA CONFIGURACIÓN T8:**\n\n"
-
-        for idx, analysis in enumerate(partial_analyses, 1):
-            context += f"## {idx}. {analysis['description']}\n"
-            context += f"Tipo: {analysis['chunk_type']}\n\n"
-            context += f"{analysis['analysis']}\n\n"
-            context += "---\n\n"
-
+        # Agrupar análisis por tipo para resumen más compacto
+        grouped = {}
+        for analysis in partial_analyses:
+            chunk_type = analysis['chunk_type']
+            if chunk_type not in grouped:
+                grouped[chunk_type] = []
+            grouped[chunk_type].append(analysis)
+        
+        # Construir contexto COMPACTO con análisis agrupados
+        context = "**ANÁLISIS DE CONFIGURACIÓN T8 (Resumen Estructurado):**\n\n"
+        
+        # Orden lógico de presentación
+        type_order = [
+            "machines_summary",
+            "system_properties", 
+            "measurement_points",
+            "processing_modes",
+            "calculated_params",
+            "operational_states",
+            "storage_strategies"
+        ]
+        
+        for chunk_type in type_order:
+            if chunk_type in grouped:
+                analyses = grouped[chunk_type]
+                context += f"### {chunk_type.replace('_', ' ').title()}\n"
+                
+                # Si hay múltiples análisis del mismo tipo, condensarlos
+                if len(analyses) > 1:
+                    context += f"*({len(analyses)} fragmentos consolidados)*\n\n"
+                    # Solo incluir los primeros 2 completos, resumir el resto
+                    for analysis in analyses[:2]:
+                        context += f"{analysis['analysis']}\n\n"
+                    if len(analyses) > 2:
+                        context += f"*... y {len(analyses) - 2} fragmentos adicionales del mismo tipo*\n\n"
+                else:
+                    context += f"{analyses[0]['analysis']}\n\n"
+                
+                context += "---\n\n"
+        
         # Agregar información básica de la config
         machines = config_data.get("machines", [])
         machine_names = [m.get("tag", "Unknown") for m in machines]
-        context += f"**Máquinas en la configuración:** {', '.join(machine_names)}\n\n"
+        context += f"**Máquinas:** {', '.join(machine_names)}\n"
+        context += f"**Total de fragmentos analizados:** {len(partial_analyses)}\n\n"
 
-        # Prompt para agregación final
+        # Prompt OPTIMIZADO para agregación final con RELACIONES explícitas
         aggregation_prompt = f"""
-Eres un experto en el sistema de monitoreo de vibración TWave T8.
-
-A continuación, te proporciono análisis parciales de diferentes secciones de un
-archivo de configuración. Tu tarea es **sintetizar estos análisis en una única
-explicación coherente y completa** para el usuario.
+Eres un experto en TWave T8. Sintetiza los siguientes análisis parciales en un 
+reporte coherente y profesional.
 
 {context}
 
-**TAREA:**
+**RELACIONES CLAVE DEL SISTEMA T8:**
 
-Genera un análisis completo y bien estructurado de la configuración, integrando
-toda la información de los análisis parciales.
+1. **Estados Operativos** → definen condiciones de la máquina (basados en speed, parámetros)
+2. **Estrategias de Almacenamiento** → SE ACTIVAN según:
+   - Estados operativos (type 2: cambios de estado entre state1_id y state2_id)
+   - Niveles de alarma de parámetros (type 3: según nivel alarm)
+   - Tiempo/Cron (type 0: cron_line)
+   - Ciclos de monitorización (type 1: cada mon_period ciclos)
+3. **Parámetros Calculados** → generan alarmas que pueden activar estrategias
+4. **Modos de Procesamiento** → definen cómo se calculan los parámetros (FFT, integración)
 
-**FORMATO DE SALIDA:**
+**INSTRUCCIONES:**
 
-Estructura tu respuesta usando encabezados Markdown:
+Al generar el reporte, EXPLICA EXPLÍCITAMENTE estas relaciones:
+- Qué estados están definidos y cómo se detectan
+- Qué estrategias se disparan con cada estado o alarma
+- Cómo las alarmas de parámetros activan estrategias de almacenamiento
+
+Usa formato Markdown:
 
 ## 📊 Resumen General
+## 🏭 Máquinas y Puntos de Medición
+## ⚙️ Procesamiento y Parámetros Calculados
+## 🔄 Estados Operativos y sus Condiciones
+## 💾 Estrategias de Almacenamiento (y qué las activa)
+## 🎯 Observaciones Clave
 
-## 🏭 Máquinas Configuradas
-
-## 📍 Puntos de Medición Principales
-
-## ⚙️ Modos de Procesamiento
-
-## 📈 Parámetros Monitoreados
-
-## 🔄 Estados Operativos
-
-## 💾 Estrategias de Almacenamiento
-
-## 🎯 Conclusiones
-
-Proporciona información clara, concisa y profesional. Evita repetir información
-innecesariamente. Enfócate en los aspectos más relevantes para el monitoreo de
-vibración y la operación del sistema.
-"""
+**Límite:** Máximo 2500 palabras. Sé técnico y explica las RELACIONES."""
 
         # Seleccionar modelo potente para agregación
         total_size = sum(len(a["analysis"]) for a in partial_analyses)
@@ -429,7 +446,7 @@ vibración y la operación del sistema.
         return self.llm_client._generate_completion(
             prompt=aggregation_prompt,
             temperature=temperature,
-            max_tokens=min(4096, model_config.max_tokens),
+            max_tokens=min(3000, model_config.max_tokens),  # Reducido de 4096 a 3000
             stream=stream,
             model=model_config.name,  # Modelo dinámico para agregación
         )

@@ -83,7 +83,7 @@ class ModelSelector:
     ) -> ModelConfig:
         """
         Selecciona el modelo óptimo para analizar un fragmento.
-        Estrategia actualizada Oct 2025: Enfoque en modelos Meta optimizados para Groq LPU.
+        Estrategia OPTIMIZADA: Usar modelos ligeros al máximo para evitar rate limits.
 
         Args:
             chunk_type: Tipo de fragmento (machines_summary, calculated_params, etc.)
@@ -92,66 +92,54 @@ class ModelSelector:
         Returns:
             Configuración del modelo seleccionado
         """
-        # REGLA 1: Por defecto - llama-3.1-8b-instant (el más rápido)
-        # Para fragmentos pequeños y tareas simples
+        # ESTRATEGIA: Maximizar uso de llama-3.1-8b-instant (tier 1, ~800 t/s)
+        # Solo usar Scout o 70B cuando sea realmente necesario
         
-        # Fragmentos muy simples -> modelo ultra-rápido
+        # Fragmentos simples -> SIEMPRE modelo ultra-rápido
         if chunk_type in [
             "machines_summary",
             "operational_states",
+            "system_properties",  # Movido aquí - no necesita Scout
+            "storage_strategies",  # Movido aquí - es bastante simple
         ]:
             return cls.MODELS["llama-3.1-8b-instant"]
 
-        # System properties: depende del tamaño
-        if chunk_type == "system_properties":
-            if content_size < 5000:
-                # Pequeño -> ultrarrápido
+        # Measurement points: casi siempre 8b-instant
+        if chunk_type == "measurement_points":
+            if content_size < 4000:  # Aumentado umbral
                 return cls.MODELS["llama-3.1-8b-instant"]
             else:
-                # Extenso -> Scout MoE (mejor para contextos grandes)
+                # Solo configs muy grandes -> Scout
                 return cls.MODELS["meta-llama/llama-4-scout-17b-16e-instruct"]
 
-        # Measurement points y storage strategies
-        if chunk_type in ["measurement_points", "storage_strategies"]:
-            if content_size < 2000:
-                # Pequeños -> ultrarrápido
-                return cls.MODELS["llama-3.1-8b-instant"]
-            else:
-                # Medianos/Grandes -> Scout MoE (ventana 16k)
-                return cls.MODELS["meta-llama/llama-4-scout-17b-16e-instruct"]
-
-        # Processing modes: técnico y potencialmente complejo
+        # Processing modes: mayormente 8b-instant
         if chunk_type == "processing_modes":
-            if content_size < 2000:
-                # Configuración simple -> rápido
+            if content_size < 3000:  # Aumentado umbral
+                return cls.MODELS["llama-3.1-8b-instant"]
+            else:
+                # Solo FFT muy complejas -> Scout
+                return cls.MODELS["meta-llama/llama-4-scout-17b-16e-instruct"]
+
+        # Calculated params: el más crítico, pero aún optimizable
+        if chunk_type == "calculated_params":
+            if content_size < 2000:  # Aumentado umbral
+                # Parámetros simples/medianos -> ultrarrápido
                 return cls.MODELS["llama-3.1-8b-instant"]
             elif content_size < 4000:
-                # Configuración media -> Scout (MoE eficiente)
+                # Parámetros complejos -> Scout (necesita mejor comprensión de unidades)
                 return cls.MODELS["meta-llama/llama-4-scout-17b-16e-instruct"]
             else:
-                # FFT complejas múltiples -> Scout (mejor razonamiento)
+                # Muy complejos con muchas alarmas -> Scout
                 return cls.MODELS["meta-llama/llama-4-scout-17b-16e-instruct"]
 
-        # Calculated params: el más variable en complejidad
-        if chunk_type == "calculated_params":
-            if content_size < 1000:
-                # Parámetros muy simples -> ultrarrápido
-                return cls.MODELS["llama-3.1-8b-instant"]
-            elif content_size < 3000:
-                # Parámetros medianos -> Scout (MoE balanceado)
-                return cls.MODELS["meta-llama/llama-4-scout-17b-16e-instruct"]
-            else:
-                # Parámetros complejos con alarmas -> Scout (mejor comprensión)
-                return cls.MODELS["meta-llama/llama-4-scout-17b-16e-instruct"]
-
-        # Fallback: Scout (modelo equilibrado)
-        return cls.MODELS["meta-llama/llama-4-scout-17b-16e-instruct"]
+        # Fallback: 8b-instant (no Scout)
+        return cls.MODELS["llama-3.1-8b-instant"]
 
     @classmethod
     def select_for_aggregation(cls, num_fragments: int, total_size: int) -> ModelConfig:
         """
         Selecciona el modelo óptimo para agregar análisis parciales.
-        Estrategia Oct 2025: Scout para agregaciones simples, 70B para complejas.
+        Estrategia OPTIMIZADA: 70B-versatile para agregación (mejor síntesis y más tokens).
 
         Args:
             num_fragments: Número de fragmentos a agregar
@@ -160,22 +148,20 @@ class ModelSelector:
         Returns:
             Configuración del modelo seleccionado
         """
-        # Agregaciones muy pequeñas (≤5 fragmentos) -> Scout (rápido y suficiente)
-        if num_fragments <= 5:
+        # ESTRATEGIA: Usar 70B-versatile para TODAS las agregaciones
+        # Razón: Es 1 sola llamada al final, necesitamos máxima calidad y tokens
+        # Los fragmentos usan 8b-instant (muchas llamadas), agregación usa 70B (1 llamada)
+        
+        # Agregaciones muy simples (≤3 fragmentos) -> Scout puede ser suficiente
+        if num_fragments <= 3:
             return cls.MODELS["meta-llama/llama-4-scout-17b-16e-instruct"]
-
-        # Agregaciones medianas (6-12 fragmentos) -> Scout (MoE eficiente)
-        # Scout 17B/16E es perfecto para este rango: buena calidad, velocidad decente
-        if num_fragments <= 12:
-            return cls.MODELS["meta-llama/llama-4-scout-17b-16e-instruct"]
-
-        # Agregaciones grandes y complejas (>12 fragmentos) -> 70B (máxima calidad)
-        # El 70B es necesario para mantener coherencia en síntesis muy complejas
-        if num_fragments > 12:
-            return cls.MODELS["llama-3.3-70b-versatile"]
-
-        # Fallback: Scout (equilibrado)
-        return cls.MODELS["meta-llama/llama-4-scout-17b-16e-instruct"]
+        
+        # Cualquier agregación mediana/grande -> 70B (mejor síntesis y contexto)
+        # El 70B-versatile es CRÍTICO para:
+        # - Mantener coherencia entre muchos fragmentos
+        # - Generar salidas más largas sin perder calidad
+        # - Mejor comprensión de relaciones entre fragmentos
+        return cls.MODELS["llama-3.3-70b-versatile"]
 
     @classmethod
     def select_for_question(

@@ -73,6 +73,12 @@ proc_modes (array): Configuración de procesamiento de señales.
     * 2: Dos veces (Desplazamiento)
   - save_sp (boolean): Guardar espectro por defecto
   - save_wf (boolean): Guardar forma de onda por defecto
+  - selectors (array): Sobrescribe save_sp/save_wf para strategy_id específicas
+
+**IMPORTANTE:**
+- El tipo (type) determina qué se calcula: solo onda, onda+espectro, etc.
+- integrate_sp afecta las unidades del espectro resultante
+- selectors permite guardar datos solo para ciertas estrategias
 """,
         "calculated_params": """
 **CONTEXTO API - Parámetros Calculados (params):**
@@ -94,9 +100,9 @@ params (array): Valores numéricos calculados desde las señales.
     * 12: Amplitud de componente armónico
     * 13: Fase de componente armónico
   - integrate (integer): Integración antes del cálculo
-    * 0: Ninguno
-    * 1: Una vez
-    * 2: Dos veces
+    * 0: Ninguno (Aceleración)
+    * 1: Una vez (Velocidad)
+    * 2: Dos veces (Desplazamiento)
   - detector (integer): Detector de amplitud (para bandas)
     * 0: Ninguno
     * 1: RMS
@@ -111,6 +117,13 @@ params (array): Valores numéricos calculados desde las señales.
     * alert1, alert2 (number): Límites de alerta
     * danger1, danger2 (number): Límites de peligro
   - unit_id (integer): ID de la unidad del resultado
+  - custom_unit_id (integer): Sobrescribe unit_id si existe
+
+**IMPORTANTE:** 
+- Para type=6 o 9, spectral_bands define las bandas de frecuencia analizadas
+- El campo 'integrate' afecta directamente a las unidades físicas del resultado
+- Los límites de alarma (alarms) varían según el estado operativo (state_id)
+- El campo 'path' indica la jerarquía: máquina:punto:parámetro
 """,
         "operational_states": """
 **CONTEXTO API - Estados Operativos (states):**

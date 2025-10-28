@@ -392,7 +392,13 @@ def compare_spectra(
     "-s",
     "--stream",
     is_flag=True,
-    help="Stream responses in real-time",
+    default=True,
+    help="Stream responses in real-time (enabled by default, use --no-stream to disable)",
+)
+@click.option(
+    "--no-stream",
+    is_flag=True,
+    help="Disable streaming responses",
 )
 @click.option(
     "-t",
@@ -431,7 +437,8 @@ def chat_config(
     config_file: str | None = None,
     question: str | None = None,
     interactive: bool = False,
-    stream: bool = False,
+    stream: bool = True,
+    no_stream: bool = False,
     temperature: float = 0.6,
     no_chunking: bool = False,
     verbose: bool = False,
@@ -465,6 +472,10 @@ def chat_config(
         t8-cli chat-config --cache-stats
     """
     import json
+
+    # Handle no_stream flag (overrides stream)
+    if no_stream:
+        stream = False
 
     try:
         from llm_client import GroqLLMClient
@@ -578,7 +589,9 @@ def chat_config(
 
         try:
             if stream:
-                click.echo("📝 Answer:\n")
+                click.echo("┌─ 🤖 Assistant")
+                click.echo("│")
+                click.echo("│  ", nl=False)
                 for chunk in llm_client.ask_about_config(
                     question=question,
                     config_data=config_data,
@@ -589,8 +602,16 @@ def chat_config(
                     max_cache_age_hours=cache_max_age,
                     verbose=verbose,
                 ):
-                    click.echo(chunk, nl=False)
-                click.echo("\n")
+                    # Handle newlines to add prefix
+                    if '\n' in chunk:
+                        lines = chunk.split('\n')
+                        for i, line in enumerate(lines):
+                            if i > 0:
+                                click.echo("\n│  ", nl=False)
+                            click.echo(line, nl=False)
+                    else:
+                        click.echo(chunk, nl=False)
+                click.echo("\n└─\n")
             else:
                 answer = llm_client.ask_about_config(
                     question=question,
@@ -601,35 +622,42 @@ def chat_config(
                     max_cache_age_hours=cache_max_age,
                     verbose=verbose,
                 )
-                click.echo(f"📝 Answer:\n{answer}\n")
+                click.echo("┌─ 🤖 Assistant")
+                click.echo("│")
+                for line in answer.split('\n'):
+                    click.echo(f"│  {line}")
+                click.echo("└─\n")
         except Exception as e:
             click.echo(f"\n❌ Error: {e}", err=True)
         return
 
     # Interactive mode
     if interactive or not question:
-        click.echo("\n" + "=" * 60)
-        click.echo("🤖 T8 Configuration Chat (Interactive Mode)")
-        click.echo("=" * 60)
-        click.echo(f"📋 Configuration source: {config_source}")
+        click.echo("\n" + "=" * 70)
+        click.echo("🤖 T8 Configuration Chat - Interactive Mode")
+        click.echo("=" * 70)
+        click.echo(f"📋 Configuration: {config_source}")
         click.echo(f"🌡️  Temperature: {temperature}")
-        click.echo(f"📡 Streaming: {'Enabled' if stream else 'Disabled'}")
-        chunking_status = "Disabled" if no_chunking else "Enabled (with cache)"
+        click.echo(f"📡 Streaming: {'✅ Enabled' if stream else '❌ Disabled'}")
+        chunking_status = "❌ Disabled" if no_chunking else "✅ Enabled (with cache)"
         click.echo(f"🧩 Chunking: {chunking_status}")
         if not no_chunking:
-            click.echo(f"⏰ Cache max age: {cache_max_age} hours")
-        click.echo("\nCommands:")
-        click.echo("  - Type your question and press Enter")
-        click.echo("  - Type 'analyze' for full configuration analysis")
-        click.echo("  - Type 'help' for suggestions")
-        click.echo("  - Type 'cache-stats' to see cache statistics")
-        click.echo("  - Type 'clear-cache' to clear the cache")
-        click.echo("  - Type 'exit' or 'quit' to exit")
-        click.echo("=" * 60 + "\n")
+            click.echo(f"⏰ Cache age: {cache_max_age} hours")
+        click.echo("\n💡 Commands:")
+        click.echo("  • Type your question and press Enter")
+        click.echo("  • 'analyze' - Full configuration analysis")
+        click.echo("  • 'help' - Show example questions")
+        click.echo("  • 'cache-stats' - View cache statistics")
+        click.echo("  • 'clear-cache' - Clear analysis cache")
+        click.echo("  • 'exit' or 'quit' - Exit chat")
+        click.echo("=" * 70 + "\n")
 
         while True:
             try:
-                user_input = click.prompt("You", type=str, prompt_suffix="> ")
+                # Prompt del usuario con mejor formato
+                click.echo("┌─ 👤 You", nl=True)
+                click.echo("│ ", nl=False)
+                user_input = click.prompt("", type=str, prompt_suffix="", show_default=False)
 
                 if not user_input.strip():
                     continue
@@ -641,31 +669,33 @@ def chat_config(
 
                 # Special commands
                 if user_input.lower() == "help":
-                    click.echo("\n💡 Suggested questions:")
-                    click.echo("  - What machines are configured in this system?")
-                    click.echo("  - What are the main measurement points?")
-                    click.echo("  - What processing modes are available?")
-                    click.echo("  - What parameters are being monitored?")
-                    click.echo("  - What are the alarm thresholds for MAD31CY005?")
-                    click.echo("  - Explain the storage strategies")
-                    click.echo("  - What sampling rates are used?\n")
+                    click.echo("\n┌─ 💡 Suggested Questions")
+                    click.echo("│")
+                    click.echo("│  • What machines are configured in this system?")
+                    click.echo("│  • What are the main measurement points?")
+                    click.echo("│  • What processing modes are available?")
+                    click.echo("│  • What parameters are being monitored?")
+                    click.echo("│  • What are the alarm thresholds for MAD31CY005?")
+                    click.echo("│  • Explain the storage strategies")
+                    click.echo("│  • What sampling rates are used?")
+                    click.echo("└─\n")
                     continue
 
                 if user_input.lower() == "cache-stats":
-                    click.echo("\n📊 Cache Statistics:")
+                    click.echo("\n┌─ 📊 Cache Statistics")
                     stats = llm_client.get_cache_stats()
                     if stats.get("available"):
-                        click.echo(f"   Total entries: {stats.get('total_entries', 0)}")
+                        click.echo(f"│  Total entries: {stats.get('total_entries', 0)}")
                         size_kb = stats.get("total_size_bytes", 0) / 1024
-                        click.echo(f"   Total size: {size_kb:.2f} KB")
+                        click.echo(f"│  Total size: {size_kb:.2f} KB")
                         configs = stats.get("configs", [])
-                        click.echo(f"   Configurations: {len(configs)}")
-                        click.echo("   Chunk types:")
+                        click.echo(f"│  Configurations: {len(configs)}")
+                        click.echo("│  Chunk types:")
                         for chunk_type, count in stats.get("chunk_types", {}).items():
-                            click.echo(f"      - {chunk_type}: {count}")
+                            click.echo(f"│     - {chunk_type}: {count}")
                     else:
-                        click.echo(f"   ❌ {stats.get('message', 'Not available')}")
-                    click.echo()
+                        click.echo(f"│  ❌ {stats.get('message', 'Not available')}")
+                    click.echo("└─\n")
                     continue
 
                 if user_input.lower() == "clear-cache":
@@ -681,8 +711,10 @@ def chat_config(
                     click.echo("\n💭 Analyzing configuration...\n")
                     try:
                         if stream:
-                            click.echo("LLM", nl=False)
-                            click.echo("> ", nl=False)
+                            click.echo("┌─ 🤖 Assistant")
+                            click.echo("│")
+                            click.echo("│  ", nl=False)
+                            col_count = 3  # Track column position for wrapping
                             for chunk in llm_client.analyze_t8_configuration(
                                 config_data=config_data,
                                 api_definitions=api_definitions,
@@ -692,8 +724,19 @@ def chat_config(
                                 max_cache_age_hours=cache_max_age,
                                 verbose=verbose,
                             ):
-                                click.echo(chunk, nl=False)
-                            click.echo("\n")
+                                # Handle newlines to add prefix
+                                if '\n' in chunk:
+                                    lines = chunk.split('\n')
+                                    for i, line in enumerate(lines):
+                                        if i > 0:
+                                            click.echo("\n│  ", nl=False)
+                                            col_count = 3
+                                        click.echo(line, nl=False)
+                                        col_count += len(line)
+                                else:
+                                    click.echo(chunk, nl=False)
+                                    col_count += len(chunk)
+                            click.echo("\n└─\n")
                         else:
                             answer = llm_client.analyze_t8_configuration(
                                 config_data=config_data,
@@ -703,17 +746,22 @@ def chat_config(
                                 max_cache_age_hours=cache_max_age,
                                 verbose=verbose,
                             )
-                            click.echo(f"LLM> {answer}\n")
+                            click.echo("┌─ 🤖 Assistant")
+                            click.echo("│")
+                            for line in answer.split('\n'):
+                                click.echo(f"│  {line}")
+                            click.echo("└─\n")
                     except Exception as e:
-                        click.echo(f"❌ Error: {e}\n", err=True)
+                        click.echo(f"\n❌ Error: {e}\n", err=True)
                     continue
 
                 # Regular question
                 click.echo()
                 try:
                     if stream:
-                        click.echo("LLM", nl=False)
-                        click.echo("> ", nl=False)
+                        click.echo("┌─ 🤖 Assistant")
+                        click.echo("│")
+                        click.echo("│  ", nl=False)
                         for chunk in llm_client.ask_about_config(
                             question=user_input,
                             config_data=config_data,
@@ -724,8 +772,16 @@ def chat_config(
                             max_cache_age_hours=cache_max_age,
                             verbose=verbose,
                         ):
-                            click.echo(chunk, nl=False)
-                        click.echo("\n")
+                            # Handle newlines to add prefix
+                            if '\n' in chunk:
+                                lines = chunk.split('\n')
+                                for i, line in enumerate(lines):
+                                    if i > 0:
+                                        click.echo("\n│  ", nl=False)
+                                    click.echo(line, nl=False)
+                            else:
+                                click.echo(chunk, nl=False)
+                        click.echo("\n└─\n")
                     else:
                         answer = llm_client.ask_about_config(
                             question=user_input,
@@ -736,9 +792,13 @@ def chat_config(
                             max_cache_age_hours=cache_max_age,
                             verbose=verbose,
                         )
-                        click.echo(f"LLM> {answer}\n")
+                        click.echo("┌─ 🤖 Assistant")
+                        click.echo("│")
+                        for line in answer.split('\n'):
+                            click.echo(f"│  {line}")
+                        click.echo("└─\n")
                 except Exception as e:
-                    click.echo(f"❌ Error: {e}\n", err=True)
+                    click.echo(f"\n❌ Error: {e}\n", err=True)
 
             except (KeyboardInterrupt, EOFError):
                 click.echo("\n\n👋 Goodbye!")
@@ -752,7 +812,9 @@ def chat_config(
 
         try:
             if stream:
-                click.echo("📝 Analysis:\n")
+                click.echo("┌─ 🤖 Assistant")
+                click.echo("│")
+                click.echo("│  ", nl=False)
                 for chunk in llm_client.analyze_t8_configuration(
                     config_data=config_data,
                     temperature=temperature,
@@ -761,8 +823,16 @@ def chat_config(
                     max_cache_age_hours=cache_max_age,
                     verbose=verbose,
                 ):
-                    click.echo(chunk, nl=False)
-                click.echo("\n")
+                    # Handle newlines to add prefix
+                    if '\n' in chunk:
+                        lines = chunk.split('\n')
+                        for i, line in enumerate(lines):
+                            if i > 0:
+                                click.echo("\n│  ", nl=False)
+                            click.echo(line, nl=False)
+                    else:
+                        click.echo(chunk, nl=False)
+                click.echo("\n└─\n")
             else:
                 answer = llm_client.analyze_t8_configuration(
                     config_data=config_data,
@@ -771,7 +841,11 @@ def chat_config(
                     max_cache_age_hours=cache_max_age,
                     verbose=verbose,
                 )
-                click.echo(f"📝 Analysis:\n{answer}\n")
+                click.echo("┌─ 🤖 Assistant")
+                click.echo("│")
+                for line in answer.split('\n'):
+                    click.echo(f"│  {line}")
+                click.echo("└─\n")
         except Exception as e:
             click.echo(f"❌ Error: {e}", err=True)
 
