@@ -16,6 +16,7 @@ dependencies = [
     "datetime",
     "responses",
     "requests_mock",
+    "groq>=0.13.0",
 ]
 
 [build-system]

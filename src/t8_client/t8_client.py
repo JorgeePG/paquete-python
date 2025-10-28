@@ -203,6 +203,21 @@ class T8ApiClient:
             print(f"Error in login request: {e}")
             return False
 
+    def get_configuration(self) -> dict | None:
+        """
+        Gets the complete system configuration from the API.
+
+        Returns:
+            dict | None: Configuration data or None if there's an error
+        """
+        try:
+            url = BASE_URL + "confs/0"
+            response = self.session.get(url)
+            return self.check_ok_response(response)
+        except Exception as e:
+            print(f"Error getting configuration: {e}")
+            return None
+
     def check_ok_response(self, response: requests.Response) -> dict | None:
         if response.status_code == 200:
             try:
